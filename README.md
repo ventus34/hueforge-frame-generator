@@ -2,9 +2,8 @@
 
 An interactive web app to design, preview in 3D, and export printable STL frames for [HueForge](https://www.hueforge.com/) prints and photos.
 
-<!-- 🔗 Uncomment when deployed:
+
 **[▶ Live Demo](https://ventus34.github.io/hueforge-frame-generator/)**
--->
 
 ![FrameGen 3D — app screenshot](screenshots/1.png)
 
