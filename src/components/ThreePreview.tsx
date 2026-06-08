@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { generateFrameGeometry } from '../utils/geometry';
+import { generateFrameGeometry, generateSplitFrameParts } from '../utils/geometry';
 import type { FrameParams } from '../utils/geometry';
 import type { Strip } from './MountingPlanner';
 
@@ -23,6 +23,7 @@ export const ThreePreview: React.FC<ThreePreviewProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const meshRef = useRef<THREE.Mesh | null>(null);
+  const splitMeshesRef = useRef<THREE.Mesh[]>([]);
   const tapeMeshesRef = useRef<THREE.Mesh[]>([]);
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -42,7 +43,7 @@ export const ThreePreview: React.FC<ThreePreviewProps> = ({
     sceneRef.current = scene;
 
     // 2. Camera
-    const camera = new THREE.PerspectiveCamera(45, width / height, 1, 1000);
+    const camera = new THREE.PerspectiveCamera(45, width / height, 1, 5000);
     camera.position.set(200, 250, 300);
     cameraRef.current = camera;
 
@@ -58,7 +59,7 @@ export const ThreePreview: React.FC<ThreePreviewProps> = ({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 + 0.1; // Limit rotating below ground
+    controls.maxPolarAngle = Math.PI; // Allow rotating below print bed to see back tape strips
     controlsRef.current = controls;
 
     // 5. Lighting
@@ -156,12 +157,17 @@ export const ThreePreview: React.FC<ThreePreviewProps> = ({
       meshRef.current = null;
     }
 
-    // Generate new geometry
-    const { positions, normals } = generateFrameGeometry(params);
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    // Remove old split meshes
+    splitMeshesRef.current.forEach((sMesh) => {
+      scene.remove(sMesh);
+      sMesh.geometry.dispose();
+      if (Array.isArray(sMesh.material)) {
+        sMesh.material.forEach((mat) => mat.dispose());
+      } else {
+        sMesh.material.dispose();
+      }
+    });
+    splitMeshesRef.current = [];
 
     // Create a beautiful plastic material representing 3D printed filament
     const material = new THREE.MeshStandardMaterial({
@@ -171,23 +177,133 @@ export const ThreePreview: React.FC<ThreePreviewProps> = ({
       side: THREE.DoubleSide
     });
 
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    
-    // In our geometry:
-    // - X runs from -wOut/2 to wOut/2 (centered)
-    // - Y runs from -lOut/2 to lOut/2 (centered)
-    // - Z runs from 0 (back face, print bed) to height (front face, visible top)
-    // In Three.js, Y is UP by default.
-    // Rotate -90 degrees around X axis so:
-    //   geometry Z=0 (back face) maps to Three.js Y=0 (print bed / bottom)
-    //   geometry Z=height (front face) maps to Three.js Y=height (top, visible)
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.y = 0;
+    if (params.splitEnabled) {
+      const parts = generateSplitFrameParts(params);
 
-    scene.add(mesh);
-    meshRef.current = mesh;
+      if (params.shape === 'hex') {
+        // Count segments per side for layout offsets
+        const counts = Array(6).fill(0);
+        parts.forEach((p) => {
+          const m = p.name.match(/Side (\d+)/);
+          if (m) {
+            const sideIdx = parseInt(m[1]) - 1;
+            counts[sideIdx]++;
+          }
+        });
+
+        parts.forEach((part) => {
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute('position', new THREE.BufferAttribute(part.positions, 3));
+          geometry.setAttribute('normal', new THREE.BufferAttribute(part.normals, 3));
+
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          mesh.rotation.x = -Math.PI / 2;
+
+          const gap = 2.5;
+          let dx = 0;
+          let dy = 0;
+
+          const m = part.name.match(/Side (\d+)(?:\s*-\s*Part\s*(\d+))?/);
+          if (m) {
+            const sideIdx = parseInt(m[1]) - 1;
+            const i = m[2] ? parseInt(m[2]) - 1 : 0;
+            const N = counts[sideIdx];
+
+            const angle = (sideIdx * Math.PI) / 3 + Math.PI / 6;
+            const nx = Math.cos(angle);
+            const ny = Math.sin(angle);
+
+            const tx = -Math.sin(angle);
+            const ty = Math.cos(angle);
+
+            const disp_normal = gap;
+            let disp_tangent = 0;
+            if (N > 1) {
+              disp_tangent = (i - (N - 1) / 2) * gap;
+            }
+
+            dx = disp_normal * nx + disp_tangent * tx;
+            dy = disp_normal * ny + disp_tangent * ty;
+          }
+
+          mesh.position.set(dx, 0, -dy);
+
+          scene.add(mesh);
+          splitMeshesRef.current.push(mesh);
+        });
+      } else {
+        // Count segments per side for layout offsets
+        const counts = { top: 0, bottom: 0, left: 0, right: 0 };
+        parts.forEach((p) => {
+          if (p.name.startsWith('Top')) counts.top++;
+          else if (p.name.startsWith('Bottom')) counts.bottom++;
+          else if (p.name.startsWith('Left')) counts.left++;
+          else if (p.name.startsWith('Right')) counts.right++;
+        });
+
+        const indices = { top: 0, bottom: 0, left: 0, right: 0 };
+
+        parts.forEach((part) => {
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute('position', new THREE.BufferAttribute(part.positions, 3));
+          geometry.setAttribute('normal', new THREE.BufferAttribute(part.normals, 3));
+
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          mesh.rotation.x = -Math.PI / 2;
+
+          // Visual gap for exploded view of parts (e.g. 2.5mm)
+          const gap = 2.5;
+          let dx = 0;
+          let dy = 0;
+
+          if (part.name.startsWith('Top')) {
+            dy = gap;
+            const N = counts.top;
+            const i = indices.top++;
+            if (N > 1) dx = (i - (N - 1) / 2) * gap;
+          } else if (part.name.startsWith('Bottom')) {
+            dy = -gap;
+            const N = counts.bottom;
+            const i = indices.bottom++;
+            if (N > 1) dx = ((N - 1 - i) - (N - 1) / 2) * gap;
+          } else if (part.name.startsWith('Left')) {
+            dx = -gap;
+            const N = counts.left;
+            const i = indices.left++;
+            if (N > 1) dy = (i - (N - 1) / 2) * gap;
+          } else if (part.name.startsWith('Right')) {
+            dx = gap;
+            const N = counts.right;
+            const i = indices.right++;
+            if (N > 1) dy = ((N - 1 - i) - (N - 1) / 2) * gap;
+          }
+
+          mesh.position.set(dx, 0, -dy);
+
+          scene.add(mesh);
+          splitMeshesRef.current.push(mesh);
+        });
+      }
+    } else {
+      const { positions, normals } = generateFrameGeometry(params);
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = 0;
+
+      scene.add(mesh);
+      meshRef.current = mesh;
+    }
 
     // Adjust camera look-at center to match frame height
     if (controlsRef.current) {
@@ -200,12 +316,42 @@ export const ThreePreview: React.FC<ThreePreviewProps> = ({
     const scene = sceneRef.current;
     if (!scene) return;
 
+    // 1. Update frame transparency depending on tape visualization state and strips existence
+    const updateMaterial = (mat: THREE.Material) => {
+      const standardMat = mat as THREE.MeshStandardMaterial;
+      if (visualizeTape && strips.length > 0) {
+        standardMat.transparent = true;
+        standardMat.opacity = 0.45;
+      } else {
+        standardMat.transparent = false;
+        standardMat.opacity = 1.0;
+      }
+      standardMat.needsUpdate = true;
+    };
+
+    const applyOpacity = (mesh: THREE.Mesh | null) => {
+      if (!mesh) return;
+      if (Array.isArray(mesh.material)) {
+        mesh.material.forEach(updateMaterial);
+      } else {
+        updateMaterial(mesh.material);
+      }
+    };
+
+    applyOpacity(meshRef.current);
+    splitMeshesRef.current.forEach(applyOpacity);
+
     // Helper validation functions for 3D strip collision check
     const isPointInFrame = (x: number, y: number): boolean => {
       const wPocket = params.wPic + 2 * params.clearance;
       const lPocket = params.shape === 'hex' ? wPocket : (params.lPic + 2 * params.clearance);
       const wOut = wPocket + 2 * params.tBorder;
       const lOut = params.shape === 'hex' ? wOut : (lPocket + 2 * params.tBorder);
+
+      const maxShelf = Math.min(wPocket, lPocket) / 2 - 2;
+      const actualShelf = Math.min(params.sShelf, maxShelf);
+      const wHole = wPocket - 2 * actualShelf;
+      const lHole = params.shape === 'hex' ? wHole : (lPocket - 2 * actualShelf);
 
       if (params.shape === 'hex') {
         const isInsideHex = (px: number, py: number, size: number) => {
@@ -217,7 +363,7 @@ export const ThreePreview: React.FC<ThreePreviewProps> = ({
         };
 
         const inOuter = isInsideHex(x, y, wOut);
-        const inInner = isInsideHex(x, y, wPocket);
+        const inInner = isInsideHex(x, y, wHole);
 
         return inOuter && !inInner;
       } else {
@@ -225,7 +371,7 @@ export const ThreePreview: React.FC<ThreePreviewProps> = ({
         const absY = Math.abs(y);
 
         const inOuter = absX <= wOut / 2 && absY <= lOut / 2;
-        const inInner = absX < wPocket / 2 && absY < lPocket / 2;
+        const inInner = absX < wHole / 2 && absY < lHole / 2;
 
         if (inOuter && !inInner && params.cornerRadius > 0) {
           const r = Math.min(params.cornerRadius, wOut / 2, lOut / 2);

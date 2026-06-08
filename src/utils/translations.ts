@@ -16,6 +16,9 @@ export const TRANSLATIONS = {
     presetSquare: 'Kwadrat',
     presetPhoto: 'Zdjęcie',
     presetHex: 'Heksagon',
+    presetPosterM: 'Plakat M (45x32 cm)',
+    presetPosterL: 'Plakat L (67.5x48 cm)',
+    presetPosterXL: 'Plakat XL (90x64 cm)',
     
     // Shape selector
     shapeTitle: 'Kształt Ramki',
@@ -113,7 +116,20 @@ export const TRANSLATIONS = {
     colorOrange: 'PLA Pomarańczowy',
     colorWhite: 'PLA Biały',
     colorGold: 'PLA Silk Złoty',
-    colorGray: 'PLA Szary'
+    colorGray: 'PLA Szary',
+
+    // Splitting
+    splitTitle: 'Dzielenie Ramki (Druk w częściach)',
+    splitToggle: 'Włącz dzielenie ramki',
+    maxPartLength: 'Maks. długość części',
+    jointType: 'Typ połączenia',
+    jointHalfLap: 'Na zakładkę (Half-lap)',
+    jointBowtie: 'Ukośne z motylkiem (Bowtie)',
+    jointDovetail: 'Jaskółczy ogon (Dovetail)',
+    downloadPartsTitle: 'Pobierz części ramki',
+    downloadPartBtn: 'Pobierz część',
+    downloadBowtieBtn: 'Pobierz motylka (Bowtie)',
+    jointTypeDesc: 'Złącza stolarskie umożliwiają precyzyjne łączenie i klejenie części po wydruku.'
   },
   en: {
     // Header
@@ -130,6 +146,9 @@ export const TRANSLATIONS = {
     presetSquare: 'Square',
     presetPhoto: 'Photo',
     presetHex: 'Hexagon',
+    presetPosterM: 'Poster M (45x32 cm)',
+    presetPosterL: 'Poster L (67.5x48 cm)',
+    presetPosterXL: 'Poster XL (90x64 cm)',
     
     // Shape selector
     shapeTitle: 'Frame Shape',
@@ -227,7 +246,20 @@ export const TRANSLATIONS = {
     colorOrange: 'PLA Orange',
     colorWhite: 'PLA White',
     colorGold: 'PLA Silk Gold',
-    colorGray: 'PLA Gray'
+    colorGray: 'PLA Gray',
+
+    // Splitting
+    splitTitle: 'Frame Splitting (Multi-part print)',
+    splitToggle: 'Enable frame splitting',
+    maxPartLength: 'Max part length',
+    jointType: 'Joint type',
+    jointHalfLap: 'Half-lap joint',
+    jointBowtie: 'Miter with Bowtie key',
+    jointDovetail: 'Dovetail joint',
+    downloadPartsTitle: 'Download Frame Parts',
+    downloadPartBtn: 'Download part',
+    downloadBowtieBtn: 'Download Bowtie Key',
+    jointTypeDesc: 'Woodworking joints allow robust connection and alignment when gluing printed parts.'
   }
 };
 export type TranslationType = typeof TRANSLATIONS.pl;

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import type { FrameParams } from '../utils/geometry';
+import { generateSplitFrameParts, generateBowtieKeyGeometry } from '../utils/geometry';
+import { downloadSTL } from '../utils/stlExporter';
 import { TRANSLATIONS } from '../utils/translations';
 import type { Lang } from '../utils/translations';
 
@@ -30,8 +32,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     { name: `${t.presetSquare} 100x100`, w: 100, l: 100, shape: 'rect' as const },
     { name: `${t.presetHex} 100 (Hex)`, w: 100, l: 100, shape: 'hex' as const },
     { name: `${t.presetHex} 200 (Hex)`, w: 200, l: 200, shape: 'hex' as const },
-    { name: `${t.presetPhoto} 100x150`, w: 100, l: 150, shape: 'rect' as const },
-    { name: `${t.presetPhoto} 150x200`, w: 150, l: 200, shape: 'rect' as const }
+    { name: `${t.presetPhoto} 150x200`, w: 150, l: 200, shape: 'rect' as const },
+    { name: `${t.presetPosterM}`, w: 320, l: 450, shape: 'rect' as const },
+    { name: `${t.presetPosterL}`, w: 480, l: 675, shape: 'rect' as const },
+    { name: `${t.presetPosterXL}`, w: 640, l: 900, shape: 'rect' as const }
   ];
 
   const updateParam = <K extends keyof FrameParams>(key: K, value: FrameParams[K]) => {
@@ -41,6 +45,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       if (value === 'hex') {
         newParams.cornerRadius = 0;
         newParams.hangerEnabled = false;
+        if (newParams.jointType === 'bowtie') {
+          newParams.jointType = 'half-lap';
+        }
       }
     }
 
@@ -87,6 +94,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     if (shape === 'hex') {
       newParams.cornerRadius = 0;
       newParams.hangerEnabled = false;
+      if (newParams.jointType === 'bowtie') {
+        newParams.jointType = 'half-lap';
+      }
     }
 
     const wPocket = w + 2 * params.clearance;
@@ -207,7 +217,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <input
                 type="range"
                 min="50"
-                max="400"
+                max="1000"
                 value={params.wPic}
                 onChange={(e) => updateParam('wPic', parseInt(e.target.value))}
               />
@@ -215,7 +225,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 type="number"
                 className="numeric-input"
                 min="50"
-                max="400"
+                max="1000"
                 value={params.wPic}
                 onChange={(e) => updateParam('wPic', parseInt(e.target.value) || 50)}
               />
@@ -233,7 +243,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 <input
                   type="range"
                   min="50"
-                  max="400"
+                  max="1000"
                   value={params.lPic}
                   onChange={(e) => updateParam('lPic', parseInt(e.target.value))}
                 />
@@ -241,7 +251,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   type="number"
                   className="numeric-input"
                   min="50"
-                  max="400"
+                  max="1000"
                   value={params.lPic}
                   onChange={(e) => updateParam('lPic', parseInt(e.target.value) || 50)}
                 />
@@ -520,6 +530,118 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             )}
           </div>
         )}
+
+        {/* Frame Splitting Options */}
+        <div>
+          <h2 className="section-title">{t.splitTitle}</h2>
+          
+          {/* Split toggle */}
+          <label className="toggle-field">
+            <span className="field-label">{t.splitToggle}</span>
+            <input
+              type="checkbox"
+              checked={params.splitEnabled}
+              onChange={(e) => updateParam('splitEnabled', e.target.checked)}
+            />
+            <div className="toggle-switch"></div>
+          </label>
+
+          {params.splitEnabled && (
+            <div style={{ marginTop: '0.75rem', paddingLeft: '0.75rem', borderLeft: '2px solid var(--color-primary)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              
+              {/* Max Part Length */}
+              <div className="form-field">
+                <div className="field-header">
+                  <span className="field-label">{t.maxPartLength}</span>
+                  <span className="field-value">{params.maxPartLength} mm</span>
+                </div>
+                <div className="slider-container">
+                  <input
+                    type="range"
+                    min="100"
+                    max="400"
+                    value={params.maxPartLength}
+                    onChange={(e) => updateParam('maxPartLength', parseInt(e.target.value))}
+                  />
+                  <input
+                    type="number"
+                    className="numeric-input"
+                    min="100"
+                    max="400"
+                    value={params.maxPartLength}
+                    onChange={(e) => updateParam('maxPartLength', parseInt(e.target.value) || 100)}
+                  />
+                </div>
+              </div>
+
+              {/* Joint Type Select */}
+              <div className="form-field">
+                <div className="field-header">
+                  <span className="field-label">{t.jointType}</span>
+                </div>
+                <select
+                  value={params.jointType}
+                  onChange={(e) => updateParam('jointType', e.target.value as any)}
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem',
+                    background: '#1a1d24',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '4px',
+                    color: 'var(--text-main)',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="half-lap">{t.jointHalfLap}</option>
+                  {params.shape !== 'hex' && <option value="bowtie">{t.jointBowtie}</option>}
+                  <option value="dovetail">{t.jointDovetail}</option>
+                </select>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', lineHeight: '1.3' }}>
+                  {t.jointTypeDesc}
+                </p>
+              </div>
+
+              {/* Dynamic Download Parts List */}
+              <div style={{ marginTop: '0.5rem' }}>
+                <span className="field-label" style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                  {t.downloadPartsTitle}
+                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                  {generateSplitFrameParts(params).map((part) => (
+                    <button
+                      key={part.name}
+                      className="preset-btn"
+                      style={{ width: '100%', padding: '0.4rem', fontSize: '0.8rem', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}
+                      onClick={() => {
+                        const prefix = lang === 'en' ? 'part' : 'czesc';
+                        const cleanName = part.name.toLowerCase().replace(/\s+/g, '_');
+                        downloadSTL(part.positions, part.normals, `${prefix}_${cleanName}.stl`);
+                      }}
+                    >
+                      <span>{part.name}</span>
+                      <span>💾</span>
+                    </button>
+                  ))}
+                  {params.jointType === 'bowtie' && (
+                    <button
+                      className="preset-btn"
+                      style={{ width: '100%', padding: '0.4rem', fontSize: '0.8rem', justifyContent: 'space-between', display: 'flex', alignItems: 'center', borderColor: 'var(--color-primary)', color: 'var(--color-primary-hover)' }}
+                      onClick={() => {
+                        const keyGeom = generateBowtieKeyGeometry(params);
+                        downloadSTL(keyGeom.positions, keyGeom.normals, `bowtie_key.stl`);
+                      }}
+                    >
+                      <span>{t.downloadBowtieBtn}</span>
+                      <span>💾</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          )}
+        </div>
 
         {/* Viewport Helpers */}
         <div>

@@ -72,6 +72,12 @@ export const MountingPlanner: React.FC<MountingPlannerProps> = ({
   const wOut = wPocket + 2 * params.tBorder;
   const lOut = params.shape === 'hex' ? wOut : (lPocket + 2 * params.tBorder);
 
+  // Compute support shelf and inner hole dimensions
+  const maxShelf = Math.min(wPocket, lPocket) / 2 - 2;
+  const actualShelf = Math.min(params.sShelf, maxShelf);
+  const wHole = wPocket - 2 * actualShelf;
+  const lHole = params.shape === 'hex' ? wHole : (lPocket - 2 * actualShelf);
+
   // Canvas base scaling parameters (fits frame inside measured viewport)
   const padding = 50;
   const maxDim = Math.max(wOut, lOut);
@@ -258,7 +264,7 @@ export const MountingPlanner: React.FC<MountingPlannerProps> = ({
     setActiveStripId(null);
   };
 
-  // Helper to check if a single point (x,y) in mm is inside the frame solid border area
+  // Helper to check if a single point (x,y) in mm is inside the frame solid border area (including support shelf)
   const isPointInFrame = (x: number, y: number): boolean => {
     if (params.shape === 'hex') {
       const isInsideHex = (px: number, py: number, size: number) => {
@@ -270,7 +276,7 @@ export const MountingPlanner: React.FC<MountingPlannerProps> = ({
       };
 
       const inOuter = isInsideHex(x, y, wOut);
-      const inInner = isInsideHex(x, y, wPocket);
+      const inInner = isInsideHex(x, y, wHole);
 
       return inOuter && !inInner;
     } else {
@@ -278,7 +284,7 @@ export const MountingPlanner: React.FC<MountingPlannerProps> = ({
       const absY = Math.abs(y);
 
       const inOuter = absX <= wOut / 2 && absY <= lOut / 2;
-      const inInner = absX < wPocket / 2 && absY < lPocket / 2;
+      const inInner = absX < wHole / 2 && absY < lHole / 2;
 
       if (inOuter && !inInner && params.cornerRadius > 0) {
         const r = Math.min(params.cornerRadius, wOut / 2, lOut / 2);
@@ -431,10 +437,18 @@ export const MountingPlanner: React.FC<MountingPlannerProps> = ({
                   stroke="rgba(255, 81, 0, 0.4)"
                   strokeWidth={2 / zoom}
                 />
-                {/* Pocket Hexagon */}
+                {/* Pocket Hexagon (Support Shelf Area boundary) */}
+                <polygon
+                  points={polyPointsHex(wPocket)}
+                  fill="rgba(51, 34, 17, 0.35)"
+                  stroke="rgba(255, 255, 255, 0.15)"
+                  strokeWidth={1.5 / zoom}
+                  strokeDasharray="4,4"
+                />
+                {/* Inner Hole Hexagon (Empty Center) */}
                 <polygon
                   id="emptyCenter"
-                  points={polyPointsHex(wPocket)}
+                  points={polyPointsHex(wHole)}
                   fill="#0d0e12"
                   stroke="rgba(255, 255, 255, 0.08)"
                   strokeWidth={1.5 / zoom}
@@ -454,13 +468,24 @@ export const MountingPlanner: React.FC<MountingPlannerProps> = ({
                   stroke="rgba(255, 81, 0, 0.4)"
                   strokeWidth={2 / zoom}
                 />
-                {/* Pocket Rectangle */}
+                {/* Pocket Rectangle (Support Shelf Area boundary) */}
                 <rect
-                  id="emptyCenter"
                   x={-wPocket * baseScale / 2}
                   y={-lPocket * baseScale / 2}
                   width={wPocket * baseScale}
                   height={lPocket * baseScale}
+                  fill="rgba(51, 34, 17, 0.35)"
+                  stroke="rgba(255, 255, 255, 0.15)"
+                  strokeWidth={1.5 / zoom}
+                  strokeDasharray="4,4"
+                />
+                {/* Inner Hole Rectangle (Empty Center) */}
+                <rect
+                  id="emptyCenter"
+                  x={-wHole * baseScale / 2}
+                  y={-lHole * baseScale / 2}
+                  width={wHole * baseScale}
+                  height={lHole * baseScale}
                   fill="#0d0e12"
                   stroke="rgba(255, 255, 255, 0.08)"
                   strokeWidth={1.5 / zoom}

@@ -3,7 +3,7 @@ import { ControlPanel } from './components/ControlPanel';
 import { ThreePreview } from './components/ThreePreview';
 import { MountingPlanner } from './components/MountingPlanner';
 import type { Strip } from './components/MountingPlanner';
-import { generateFrameGeometry, calculateFrameVolume } from './utils/geometry';
+import { generateFrameGeometry, calculateFrameVolume, generateSplitFrameParts, generateBowtieKeyGeometry } from './utils/geometry';
 import type { FrameParams } from './utils/geometry';
 import { downloadSTL } from './utils/stlExporter';
 import { TRANSLATIONS } from './utils/translations';
@@ -22,7 +22,10 @@ const DEFAULT_PARAMS: FrameParams = {
   hangerEnabled: false,
   hangerSide: 'top',
   hangerCount: 1,
-  hangerDiameter: 8
+  hangerDiameter: 8,
+  splitEnabled: false,
+  maxPartLength: 200,
+  jointType: 'half-lap'
 };
 
 const FILAMENT_COLORS = [
@@ -58,11 +61,24 @@ function App() {
   const weightGrams = volumeCm3 * 1.24; // Standard PLA density
 
   const handleDownload = () => {
-    const { positions, normals } = generateFrameGeometry(params);
-    const shapeStr = params.shape === 'hex' ? 'hex' : 'rect';
-    const prefix = lang === 'en' ? 'frame' : 'ramka';
-    const filename = `${prefix}_${shapeStr}_${params.wPic}x${params.shape === 'hex' ? params.wPic : params.lPic}mm_h${params.height}_b${params.tBorder}.stl`;
-    downloadSTL(positions, normals, filename);
+    if (params.splitEnabled) {
+      const parts = generateSplitFrameParts(params);
+      parts.forEach((part) => {
+        const prefix = lang === 'en' ? 'part' : 'czesc';
+        const cleanName = part.name.toLowerCase().replace(/\s+/g, '_');
+        downloadSTL(part.positions, part.normals, `${prefix}_${cleanName}.stl`);
+      });
+      if (params.jointType === 'bowtie' && params.shape !== 'hex') {
+        const keyGeom = generateBowtieKeyGeometry(params);
+        downloadSTL(keyGeom.positions, keyGeom.normals, `bowtie_key.stl`);
+      }
+    } else {
+      const { positions, normals } = generateFrameGeometry(params);
+      const shapeStr = params.shape === 'hex' ? 'hex' : 'rect';
+      const prefix = lang === 'en' ? 'frame' : 'ramka';
+      const filename = `${prefix}_${shapeStr}_${params.wPic}x${params.shape === 'hex' ? params.wPic : params.lPic}mm_h${params.height}_b${params.tBorder}.stl`;
+      downloadSTL(positions, normals, filename);
+    }
   };
 
   return (
