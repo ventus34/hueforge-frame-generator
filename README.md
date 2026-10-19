@@ -12,13 +12,17 @@ An interactive web app to design, preview in 3D, and export printable STL frames
 ## 🌟 Features
 
 - **Interactive 3D Preview** — Real-time Three.js rendering with PLA color presets, custom hex picker, OrbitControls, and a virtual print-bed grid.
-- **Parametric Keyhole Hangers** — Watertight vertical keyhole mounting slot generated from technical wood-milling specs.
-- **Proportional Auto-Scaling** — Keyhole dimensions shrink automatically when the border is too narrow, keeping walls intact.
-- **Rounded Outer Corners** — Adjustable corner radii with smooth rectangular-inner → rounded-outer transitions.
+- **Blind Mounting Recesses** — Optional cylindrical recesses open from the back of the frame; their diameter is limited by the border width.
+- **Rounded Outer Corners** — Adjustable corner radius for unsplit rectangular frames.
 - **Hexagonal Frames** — Full honeycomb support for tiling prints on walls.
 - **2D Mounting Planner** — Drag-and-drop canvas for arranging Command strips (S / M / L) on the frame's back.
-- **Manifold STL Compiler** — Zero-dependency binary STL writer producing watertight meshes in milliseconds.
-- **Live Stats** — Bounding dimensions, volume (cm³), and estimated filament weight updated in real time.
+- **STL Export** — Binary STL export for frames and split parts.
+- **Project Files** — Changes are saved in browser storage; import or export a versioned JSON project file.
+- **Split-Part ZIP** — Download all part STLs, assembly notes, a manifest, and the Bowtie key when needed.
+- **Printer Fit Checks** — Choose a bed preset or enter custom dimensions; checks allow a 90° rotation of each part.
+- **Live Stats** — Bounding dimensions, volume (cm³), and estimated mass for a solid PLA model.
+
+The mounting recesses are blind cylinders, not keyhole slots: they do not have a wider chamber for a screw head and a narrow entry channel. The PLA mass estimate assumes a fully solid model and does not account for infill, walls, supports, or slicer settings. Printer fit checks use each part's XY bounding rectangle and do not include brim, skirt, clips, or slicer margins. Split frames disable corner rounding.
 
 ---
 
@@ -38,8 +42,8 @@ An interactive web app to design, preview in 3D, and export printable STL frames
 
 ### Prerequisites
 
-- **Node.js** ≥ 18 (LTS recommended)
-- **npm** ≥ 9
+- **Node.js** ≥ 24
+- **npm** ≥ 10
 
 ### 1. Clone & install
 
@@ -63,7 +67,17 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 npm run build
 ```
 
-The optimized bundle lands in `dist/`. A copy is also kept in `docs/` for GitHub Pages hosting.
+The optimized bundle lands in `dist/`. GitHub Actions checks lint, tests, and the production build on pull requests. Pushes to `main` and manual workflow runs also deploy the result to GitHub Pages. Set the repository's Pages source to **GitHub Actions** to enable deployment.
+
+### Quality checks
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+The test suite uses Node.js 24's native TypeScript support to import geometry modules directly.
 
 ---
 
@@ -79,6 +93,8 @@ The optimized bundle lands in `dist/`. A copy is also kept in `docs/` for GitHub
 | **Support shelf** | Inner lip that holds the print and prevents it from falling forward |
 | **Corner radius** | Outer corner rounding (rectangular frames only) |
 
+Project settings are saved in this browser automatically. Use the Project controls to export a JSON backup or load a project file on another device. When frame splitting is enabled, the main download creates a ZIP with STL parts, assembly notes, a fit manifest, and a Bowtie key if the selected joint needs one.
+
 ---
 
 ## 🇵🇱 O Projekcie
@@ -88,8 +104,12 @@ Interaktywna aplikacja webowa służąca do projektowania i generowania gotowych
 **Możliwości:**
 - Podgląd 3D modelu w różnych kolorach filamentu (wbudowany próbnik + dowolny kolor HEX) na wirtualnym stole roboczym
 - Planowanie rozmieszczenia rzepów montażowych (Command strips) w interaktywnym planerze 2D
-- Dodawanie wycięć pod gwoździe (Keyhole Slot) z automatycznym dopasowaniem do szerokości ścianki
+- Dodawanie ślepych, cylindrycznych zagłębień montażowych od tyłu ramki; to nie są otwory typu keyhole
+- Automatyczny zapis w przeglądarce oraz import i eksport projektu JSON
+- Eksport podzielonej ramki jako ZIP z plikami STL, opisem montażu i manifestem dopasowania części do stołu
+- Profile wymiarów stołu drukarki i kontrola dopasowania części z obrotem o 90°
 - Generowanie i pobieranie pliku STL gotowego do druku 3D
+- Szacowana masa zakłada pełny model z PLA — nie uwzględnia wypełnienia ani ustawień slicera
 
 ---
 

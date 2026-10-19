@@ -2,8 +2,43 @@
  * Converts unindexed float arrays of positions and normals into a binary STL ArrayBuffer.
  */
 export function exportBinarySTL(positions: Float32Array, normals: Float32Array): ArrayBuffer {
+  if (positions.length === 0 || positions.length % 9 !== 0) {
+    throw new RangeError('STL positions must contain one or more complete triangles.');
+  }
+  if (normals.length !== positions.length) {
+    throw new RangeError('STL normals must have one vector for every vertex.');
+  }
+  for (let i = 0; i < positions.length; i++) {
+    if (!Number.isFinite(positions[i])) throw new RangeError(`STL position ${i} is not finite.`);
+    if (!Number.isFinite(normals[i])) throw new RangeError(`STL normal ${i} is not finite.`);
+  }
   const numTriangles = positions.length / 9;
+  for (let triangle = 0; triangle < numTriangles; triangle++) {
+    const i = triangle * 9;
+    const ax = positions[i + 3] - positions[i];
+    const ay = positions[i + 4] - positions[i + 1];
+    const az = positions[i + 5] - positions[i + 2];
+    const bx = positions[i + 6] - positions[i];
+    const by = positions[i + 7] - positions[i + 1];
+    const bz = positions[i + 8] - positions[i + 2];
+    const nx = ay * bz - az * by;
+    const ny = az * bx - ax * bz;
+    const nz = ax * by - ay * bx;
+    const areaSquared = nx * nx + ny * ny + nz * nz;
+    if (!Number.isFinite(areaSquared) || areaSquared === 0) {
+      throw new RangeError(`STL triangle ${triangle} is degenerate or exceeds the coordinate range.`);
+    }
+
+    const normalIndex = i;
+    const normalLengthSquared = normals[normalIndex] ** 2 + normals[normalIndex + 1] ** 2 + normals[normalIndex + 2] ** 2;
+    if (!Number.isFinite(normalLengthSquared) || normalLengthSquared === 0) {
+      throw new RangeError(`STL triangle ${triangle} has a zero or invalid facet normal.`);
+    }
+  }
   const bufferSize = 80 + 4 + numTriangles * 50;
+  if (!Number.isSafeInteger(bufferSize) || bufferSize > 0x7fffffff) {
+    throw new RangeError('STL file is too large to export.');
+  }
   const buffer = new ArrayBuffer(bufferSize);
   const view = new DataView(buffer);
 
@@ -66,5 +101,5 @@ export function downloadSTL(positions: Float32Array, normals: Float32Array, file
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

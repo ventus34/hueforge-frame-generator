@@ -1,3 +1,8 @@
+import { ShapeUtils } from 'three/src/extras/ShapeUtils.js';
+import { Vector2 } from 'three/src/math/Vector2.js';
+import { getEffectiveFrameDimensions, validateFrameParams } from './params.ts';
+import { planSafeSplitBoundaries } from './splitSeams.ts';
+
 export interface FrameParams {
   shape: 'rect' | 'hex';      // Frame shape: 'rect' or 'hex'
   wPic: number;               // Picture width (or flat-to-flat width for hex) (mm)
@@ -45,6 +50,7 @@ function addTriangleFace(
   const nx = e1[1] * e2[2] - e1[2] * e2[1];
   const ny = e1[2] * e2[0] - e1[0] * e2[2];
   const nz = e1[0] * e2[1] - e1[1] * e2[0];
+  if (Math.hypot(nx, ny, nz) < 1e-10) return;
   const dot = nx * normal[0] + ny * normal[1] + nz * normal[2];
   if (dot < 0) {
     positions.push(...v0, ...v2, ...v1);
@@ -52,6 +58,39 @@ function addTriangleFace(
     positions.push(...v0, ...v1, ...v2);
   }
   normals.push(...normal, ...normal, ...normal);
+}
+
+function addPolygonFaceWithHoles(
+  positions: number[],
+  normals: number[],
+  contour: [number, number][],
+  holes: [number, number][][],
+  z: number,
+  normal: [number, number, number]
+) {
+  const contourVectors = contour.map(([x, y]) => new Vector2(x, y));
+  const holeVectors = holes.map(hole => hole.map(([x, y]) => new Vector2(x, y)));
+  const vertices = [...contour, ...holes.flat()];
+  const triangles = ShapeUtils.triangulateShape(contourVectors, holeVectors);
+
+  for (const triangle of triangles) {
+    const [a, b, c] = triangle.map(index => vertices[index]);
+    addTriangleFace(
+      positions,
+      normals,
+      [a[0], a[1], z],
+      [b[0], b[1], z],
+      [c[0], c[1], z],
+      normal
+    );
+  }
+}
+
+function getCirclePolygon(cx: number, cy: number, diameter: number, sides = 12): [number, number][] {
+  return Array.from({ length: sides }, (_, index) => {
+    const angle = (index * 2 * Math.PI) / sides;
+    return [cx + (diameter / 2) * Math.cos(angle), cy + (diameter / 2) * Math.sin(angle)];
+  });
 }
 
 // Helper to add a box to the geometry arrays (kept for backwards compatibility/utilities)
@@ -112,29 +151,21 @@ function addCylindricalHole(
   normals: number[],
   cx: number,
   cy: number,
-  S: number, // Square box size
-  D: number, // Cylinder diameter
+  diameter: number,
   depth: number,
   zOpen: number,
-  goesUp: boolean = false
+  goesUp = false
 ) {
   const zMin = goesUp ? zOpen : zOpen - depth;
   const zMax = goesUp ? zOpen + depth : zOpen;
-  const M = 12; // Dodecagon for smooth cylinder
-  const points: [number, number][] = [];
+  const points = getCirclePolygon(cx, cy, diameter);
+  const sides = points.length;
 
-  for (let i = 0; i < M; i++) {
-    const theta = (i * 2 * Math.PI) / M;
-    points.push([
-      cx + (D / 2) * Math.cos(theta),
-      cy + (D / 2) * Math.sin(theta)
-    ]);
-  }
-
-  // 1. Cylindrical Wall (normals point inwards — same for both directions)
-  for (let i = 0; i < M; i++) {
-    const next = (i + 1) % M;
-    const theta = (i * 2 * Math.PI) / M;
+  // The opening is a true polygonal boundary. The planar opening face is
+  // triangulated with the same vertices by the caller, so the wall closes it.
+  for (let i = 0; i < sides; i++) {
+    const next = (i + 1) % sides;
+    const theta = ((i + 0.5) * 2 * Math.PI) / sides;
     const nx = -Math.cos(theta);
     const ny = -Math.sin(theta);
 
@@ -148,15 +179,11 @@ function addCylindricalHole(
     );
   }
 
-  // 2. Ceiling face (blind end of the hole).
-  //    goesDown: ceiling at zMin facing +Z toward opening.
-  //    goesUp:   ceiling at zMax facing -Z toward opening.
   const zCeil = goesUp ? zMax : zMin;
   const ceilNz: [number, number, number] = goesUp ? [0, 0, -1] : [0, 0, 1];
-  for (let i = 0; i < M; i++) {
-    const next = (i + 1) % M;
+  for (let i = 0; i < sides; i++) {
+    const next = (i + 1) % sides;
     if (goesUp) {
-      // CCW from below (-Z view) = reversed order
       addTriangleFace(positions, normals,
         [cx, cy, zCeil],
         [points[next][0], points[next][1], zCeil],
@@ -171,68 +198,6 @@ function addCylindricalHole(
         ceilNz
       );
     }
-  }
-
-  // 3. Opening/Transition Face (Square outer to Circle inner at hole opening Z)
-  const zFace = goesUp ? zMin : zMax;
-  const faceNz: [number, number, number] = goesUp ? [0, 0, -1] : [0, 0, 1];
-
-  const TR: [number, number] = [cx + S/2, cy + S/2];
-  const TL: [number, number] = [cx - S/2, cy + S/2];
-  const BL: [number, number] = [cx - S/2, cy - S/2];
-  const BR: [number, number] = [cx + S/2, cy - S/2];
-
-  const addQuadTriangle = (corner: [number, number], p1: [number, number], p2: [number, number]) => {
-    if (goesUp) {
-      // Reversed winding for -Z normal (bottom/back face)
-      addTriangleFace(positions, normals,
-        [corner[0], corner[1], zFace],
-        [p1[0], p1[1], zFace],
-        [p2[0], p2[1], zFace],
-        faceNz
-      );
-    } else {
-      addTriangleFace(positions, normals,
-        [corner[0], corner[1], zFace],
-        [p2[0], p2[1], zFace],
-        [p1[0], p1[1], zFace],
-        faceNz
-      );
-    }
-  };
-
-  // Quadrant 1: TR to indices 0,1,2,3
-  addQuadTriangle(TR, points[0], points[1]);
-  addQuadTriangle(TR, points[1], points[2]);
-  addQuadTriangle(TR, points[2], points[3]);
-
-  // Quadrant 2: TL to indices 3,4,5,6
-  addQuadTriangle(TL, points[3], points[4]);
-  addQuadTriangle(TL, points[4], points[5]);
-  addQuadTriangle(TL, points[5], points[6]);
-
-  // Quadrant 3: BL to indices 6,7,8,9
-  addQuadTriangle(BL, points[6], points[7]);
-  addQuadTriangle(BL, points[7], points[8]);
-  addQuadTriangle(BL, points[8], points[9]);
-
-  // Quadrant 4: BR to indices 9,10,11,0
-  addQuadTriangle(BR, points[9], points[10]);
-  addQuadTriangle(BR, points[10], points[11]);
-  addQuadTriangle(BR, points[11], points[0]);
-
-  // 4. Fill gaps between quadrants
-  if (goesUp) {
-    // Reversed winding for -Z normal
-    addTriangleFace(positions, normals, [TR[0], TR[1], zFace], [points[3][0], points[3][1], zFace], [TL[0], TL[1], zFace], faceNz);
-    addTriangleFace(positions, normals, [TL[0], TL[1], zFace], [points[6][0], points[6][1], zFace], [BL[0], BL[1], zFace], faceNz);
-    addTriangleFace(positions, normals, [BL[0], BL[1], zFace], [points[9][0], points[9][1], zFace], [BR[0], BR[1], zFace], faceNz);
-    addTriangleFace(positions, normals, [BR[0], BR[1], zFace], [points[0][0], points[0][1], zFace], [TR[0], TR[1], zFace], faceNz);
-  } else {
-    addTriangleFace(positions, normals, [TR[0], TR[1], zFace], [TL[0], TL[1], zFace], [points[3][0], points[3][1], zFace], faceNz);
-    addTriangleFace(positions, normals, [TL[0], TL[1], zFace], [BL[0], BL[1], zFace], [points[6][0], points[6][1], zFace], faceNz);
-    addTriangleFace(positions, normals, [BL[0], BL[1], zFace], [BR[0], BR[1], zFace], [points[9][0], points[9][1], zFace], faceNz);
-    addTriangleFace(positions, normals, [BR[0], BR[1], zFace], [TR[0], TR[1], zFace], [points[0][0], points[0][1], zFace], faceNz);
   }
 }
 
@@ -362,6 +327,15 @@ export function getHangerHoles(
   return centers;
 }
 
+function getPolygonArea(points: [number, number][]): number {
+  let twiceArea = 0;
+  for (let i = 0; i < points.length; i++) {
+    const next = (i + 1) % points.length;
+    twiceArea += points[i][0] * points[next][1] - points[next][0] * points[i][1];
+  }
+  return Math.abs(twiceArea) / 2;
+}
+
 /**
  * Generates the frame geometry as unindexed position and normal arrays.
  */
@@ -369,14 +343,16 @@ export function generateFrameGeometry(params: FrameParams): {
   positions: Float32Array;
   normals: Float32Array;
 } {
+  const validationErrors = validateFrameParams(params);
+  if (validationErrors.length > 0) {
+    throw new RangeError(validationErrors.join(' '));
+  }
+
   const positions: number[] = [];
   const normals: number[] = [];
 
   const {
     shape,
-    wPic,
-    lPic,
-    clearance,
     tBorder,
     height,
     dPocket,
@@ -388,10 +364,11 @@ export function generateFrameGeometry(params: FrameParams): {
   } = params;
 
   // 1. DIMENSION PREPARATION
-  const wPocket = wPic + 2 * clearance;
-  const lPocket = lPic + 2 * clearance;
-  const wOut = wPocket + 2 * tBorder;
-  const lOut = lPocket + 2 * tBorder;
+  const dimensions = getEffectiveFrameDimensions(params);
+  const wPocket = dimensions.pocketWidth;
+  const lPocket = dimensions.pocketLength;
+  const wOut = dimensions.outerWidth;
+  const lOut = dimensions.outerLength;
   
   const maxShelf = Math.min(wPocket, lPocket) / 2 - 2;
   const actualShelf = Math.min(sShelf, maxShelf);
@@ -407,131 +384,21 @@ export function generateFrameGeometry(params: FrameParams): {
   // Retrieve active hanger hole positions
   const centers = getHangerHoles(params, wOut, lOut, wPocket, lPocket);
 
-  // addHangerSegment: fills a ring face segment with rectangular slots for the hanger holes.
-  // zLevel = Z of the face; nz = +1 for top face (normal +Z) or -1 for bottom face (normal -Z).
+  // The selected back-face rail is triangulated around the exact dodecagon
+  // boundaries used by the cylindrical walls. This keeps the opening watertight.
   const addHangerSegment = (
     p1: [number, number],
     p2: [number, number],
     c1: [number, number],
     c2: [number, number],
-    side: 'top' | 'bottom' | 'left' | 'right',
+    _side: 'top' | 'bottom' | 'left' | 'right',
     zLevel: number,
     nz: number
   ) => {
-    const S = Math.min(hangerDiameter, tBorder - 2);
-    const M = centers.length;
-    const faceN: [number, number, number] = [0, 0, nz];
-    const z = zLevel;
-
-    // Winding-correct face helpers based on nz direction
-    const rf = (
-      v0: [number,number,number], v1: [number,number,number],
-      v2: [number,number,number], v3: [number,number,number]
-    ) => {
-      if (nz > 0) addFace(positions, normals, v0, v1, v2, v3, faceN);
-      else         addFace(positions, normals, v0, v3, v2, v1, faceN);
-    };
-    const rt = (
-      v0: [number,number,number], v1: [number,number,number], v2: [number,number,number]
-    ) => {
-      if (nz > 0) addTriangleFace(positions, normals, v0, v1, v2, faceN);
-      else         addTriangleFace(positions, normals, v0, v2, v1, faceN);
-    };
-
-    // 1. Generate hole corner coordinates for all holes
-    const oStarts: [number, number][] = [];
-    const oEnds: [number, number][] = [];
-    const iEnds: [number, number][] = [];
-    const iStarts: [number, number][] = [];
-
-    for (let k = 0; k < M; k++) {
-      const cx_val = centers[k].cx;
-      const cy_val = centers[k].cy;
-
-      if (side === 'top') {
-        oStarts.push([cx_val + S/2, cy_val + S/2]);
-        oEnds.push([cx_val - S/2, cy_val + S/2]);
-        iEnds.push([cx_val - S/2, cy_val - S/2]);
-        iStarts.push([cx_val + S/2, cy_val - S/2]);
-      } else if (side === 'bottom') {
-        oStarts.push([cx_val - S/2, cy_val - S/2]);
-        oEnds.push([cx_val + S/2, cy_val - S/2]);
-        iEnds.push([cx_val + S/2, cy_val + S/2]);
-        iStarts.push([cx_val - S/2, cy_val + S/2]);
-      } else if (side === 'left') {
-        oStarts.push([cx_val - S/2, cy_val + S/2]);
-        oEnds.push([cx_val - S/2, cy_val - S/2]);
-        iEnds.push([cx_val + S/2, cy_val - S/2]);
-        iStarts.push([cx_val + S/2, cy_val + S/2]);
-      } else { // right
-        oStarts.push([cx_val + S/2, cy_val - S/2]);
-        oEnds.push([cx_val + S/2, cy_val + S/2]);
-        iEnds.push([cx_val - S/2, cy_val + S/2]);
-        iStarts.push([cx_val - S/2, cy_val - S/2]);
-      }
-    }
-
-    // 2. Right/Start Region
-    rf(
-      [p1[0], p1[1], z],
-      [oStarts[0][0], oStarts[0][1], z],
-      [iStarts[0][0], iStarts[0][1], z],
-      [c1[0], c1[1], z]
-    );
-
-    // 3. Left/End Region
-    rf(
-      [oEnds[M-1][0], oEnds[M-1][1], z],
-      [p2[0], p2[1], z],
-      [c2[0], c2[1], z],
-      [iEnds[M-1][0], iEnds[M-1][1], z]
-    );
-
-    // 4. Outer/Top Region
-    const outerPts: [number, number][] = [];
-    for (let k = 0; k < M; k++) {
-      outerPts.push(oStarts[k], oEnds[k]);
-    }
-    for (let k = 0; k < 2 * M - 1; k++) {
-      rt(
-        [p1[0], p1[1], z],
-        [outerPts[k+1][0], outerPts[k+1][1], z],
-        [outerPts[k][0], outerPts[k][1], z]
-      );
-    }
-    rt(
-      [p1[0], p1[1], z],
-      [p2[0], p2[1], z],
-      [outerPts[2 * M - 1][0], outerPts[2 * M - 1][1], z]
-    );
-
-    // 5. Inner/Bottom Region
-    const innerPts: [number, number][] = [];
-    for (let k = 0; k < M; k++) {
-      innerPts.push(iStarts[k], iEnds[k]);
-    }
-    for (let k = 0; k < 2 * M - 1; k++) {
-      rt(
-        [c1[0], c1[1], z],
-        [innerPts[k][0], innerPts[k][1], z],
-        [innerPts[k+1][0], innerPts[k+1][1], z]
-      );
-    }
-    rt(
-      [c1[0], c1[1], z],
-      [innerPts[2 * M - 1][0], innerPts[2 * M - 1][1], z],
-      [c2[0], c2[1], z]
-    );
-
-    // 6. Middle Region between holes (if M > 1)
-    for (let k = 0; k < M - 1; k++) {
-      rf(
-        [oEnds[k][0], oEnds[k][1], z],
-        [oStarts[k+1][0], oStarts[k+1][1], z],
-        [iStarts[k+1][0], iStarts[k+1][1], z],
-        [iEnds[k][0], iEnds[k][1], z]
-      );
-    }
+    const diameter = Math.min(hangerDiameter, tBorder - 2);
+    const contour: [number, number][] = [p2, p1, c1, c2];
+    const holeContours = centers.map(center => getCirclePolygon(center.cx, center.cy, diameter));
+    addPolygonFaceWithHoles(positions, normals, contour, holeContours, zLevel, [0, 0, nz]);
   };
 
   if (shape === 'hex') {
@@ -774,15 +641,12 @@ export function generateFrameGeometry(params: FrameParams): {
       const D = S;
       const depth = Math.min(height - 2, 8);
       for (const c of centers) {
-        addCylindricalHole(positions, normals, c.cx, c.cy, S, D, depth, z0, true);
+        addCylindricalHole(positions, normals, c.cx, c.cy, D, depth, z0, true);
       }
     }
   }
 
-  return {
-    positions: new Float32Array(positions),
-    normals: new Float32Array(normals)
-  };
+  return orientTriangleMesh(new Float32Array(positions));
 }
 
 /**
@@ -791,9 +655,6 @@ export function generateFrameGeometry(params: FrameParams): {
 export function calculateFrameVolume(params: FrameParams): number {
   const {
     shape,
-    wPic,
-    lPic,
-    clearance,
     tBorder,
     height,
     dPocket,
@@ -804,10 +665,11 @@ export function calculateFrameVolume(params: FrameParams): number {
     hangerDiameter
   } = params;
 
-  const wPocket = wPic + 2 * clearance;
-  const lPocket = lPic + 2 * clearance;
-  const wOut = wPocket + 2 * tBorder;
-  const lOut = lPocket + 2 * tBorder;
+  const dimensions = getEffectiveFrameDimensions(params);
+  const wPocket = dimensions.pocketWidth;
+  const lPocket = dimensions.pocketLength;
+  const wOut = dimensions.outerWidth;
+  const lOut = dimensions.outerLength;
   
   const maxShelf = Math.min(wPocket, lPocket) / 2 - 2;
   const actualShelf = Math.min(sShelf, maxShelf);
@@ -827,10 +689,8 @@ export function calculateFrameVolume(params: FrameParams): number {
     pocketVolume = hexFactor * wPocket * wPocket * dPocket;
     holeVolume = hexFactor * wHole * wHole * hShelf;
   } else {
-    // Rectangular frame area = Width * Length - (4 - pi) * R^2
-    const roundedFactor = 4 - Math.PI;
     const r = Math.min(cornerRadius, wOut / 2, lOut / 2);
-    const outerArea = wOut * lOut - roundedFactor * r * r;
+    const outerArea = getPolygonArea(getRoundedRectPolygon(wOut, lOut, r));
 
     outerVolume = outerArea * height;
     pocketVolume = wPocket * lPocket * dPocket;
@@ -843,7 +703,8 @@ export function calculateFrameVolume(params: FrameParams): number {
   if (hangerEnabled && tBorder > 4 && height > 4) {
     const S = Math.min(hangerDiameter, tBorder - 2);
     const depth = Math.min(height - 2, 8);
-    const singleHoleVolume = Math.PI * (S / 2) * (S / 2) * depth;
+    const holeArea = 0.5 * 12 * (S / 2) ** 2 * Math.sin((2 * Math.PI) / 12);
+    const singleHoleVolume = holeArea * depth;
     totalVolume -= hangerCount * singleHoleVolume;
   }
 
@@ -856,28 +717,35 @@ export interface SplitPart {
   normals: Float32Array;
 }
 
-export function getBowtieDims(W: number, H: number) {
+export function getBowtieDims(W: number, H: number, maxDepth = Number.POSITIVE_INFINITY) {
   const max_sum = (W - 2) * 1.4;
-  const L_bowtie = Math.max(8, Math.min(20, max_sum * 0.6));
-  const wEnds = Math.max(4, Math.min(12, max_sum * 0.4));
+  const L_bowtie = Math.max(4, Math.min(20, max_sum * 0.6));
+  const wEnds = Math.max(1.5, Math.min(12, max_sum * 0.4));
   const wNeck = wEnds / 2;
-  const dBowtie = Math.min(4.0, H - 2);
+  const dBowtie = Math.max(0.2, Math.min(4.0, Math.max(0.2, H / 2 - 1), H - 2, maxDepth));
   return { L_bowtie, wEnds, wNeck, dBowtie };
 }
 
 // Standalone Bowtie Key
 export function generateBowtieKeyGeometry(params: FrameParams): { positions: Float32Array; normals: Float32Array } {
+  const validationErrors = validateFrameParams(params);
+  if (validationErrors.length > 0) {
+    throw new RangeError(validationErrors.join(' '));
+  }
+
   const positions: number[] = [];
   const normals: number[] = [];
   
-  const wPocket = params.wPic + 2 * params.clearance;
-  const lPocket = params.lPic + 2 * params.clearance;
+  const dimensions = getEffectiveFrameDimensions(params);
+  const wPocket = dimensions.pocketWidth;
+  const lPocket = dimensions.pocketLength;
   const maxShelf = Math.min(wPocket, lPocket) / 2 - 2;
   const actualShelf = Math.min(params.sShelf, maxShelf);
   const W = params.tBorder + actualShelf;
   const H = params.height;
+  const hShelf = Math.max(0.2, params.height - params.dPocket);
 
-  const { L_bowtie, wEnds, wNeck, dBowtie } = getBowtieDims(W, H);
+  const { L_bowtie, wEnds, wNeck, dBowtie } = getBowtieDims(W, H, hShelf - 0.5);
   
   // Apply standard 0.3 mm clearance on mating faces for printing fit
   const L = L_bowtie - 0.3;
@@ -905,6 +773,7 @@ export function generateBowtieKeyGeometry(params: FrameParams): { positions: Flo
     const nx = e1[1] * e2[2] - e1[2] * e2[1];
     const ny = e1[2] * e2[0] - e1[0] * e2[2];
     const nz = e1[0] * e2[1] - e1[1] * e2[0];
+    if (Math.hypot(nx, ny, nz) < 1e-10) return;
     const dot = nx * n[0] + ny * n[1] + nz * n[2];
     if (dot < 0) {
       positions.push(...v0, ...v2, ...v1);
@@ -961,17 +830,549 @@ export function generateBowtieKeyGeometry(params: FrameParams): { positions: Flo
   n6[0] /= len6; n6[1] /= len6;
   addQ(p5, p0, q0, q5, n6);
   
-  return {
-    positions: new Float32Array(positions),
-    normals: new Float32Array(normals)
+  return orientTriangleMesh(new Float32Array(positions));
+}
+
+type Point3 = [number, number, number];
+
+/** Reorient each connected triangle component consistently and recompute facet normals. */
+function orientTriangleMesh(positions: ArrayLike<number>): {
+  positions: Float32Array;
+  normals: Float32Array;
+} {
+  if (positions.length % 9 !== 0) {
+    throw new RangeError('Generated geometry must contain complete triangles.');
+  }
+
+  type EdgeUse = { triangle: number; direction: 1 | -1 };
+  type Neighbor = { triangle: number; sameDirection: boolean };
+  const triangleCount = positions.length / 9;
+  const edges = new Map<string, EdgeUse[]>();
+  const keyOf = (offset: number) => [0, 1, 2]
+    .map(axis => Math.round(positions[offset + axis] * 1e4))
+    .join(',');
+
+  for (let triangle = 0; triangle < triangleCount; triangle++) {
+    const offset = triangle * 9;
+    const keys = [keyOf(offset), keyOf(offset + 3), keyOf(offset + 6)] as [string, string, string];
+    for (let edgeIndex = 0; edgeIndex < 3; edgeIndex++) {
+      const start = keys[edgeIndex];
+      const end = keys[(edgeIndex + 1) % 3];
+      const [first, second] = start < end ? [start, end] : [end, start];
+      const edgeKey = `${first}|${second}`;
+      const uses = edges.get(edgeKey) ?? [];
+      uses.push({ triangle, direction: start === first ? 1 : -1 });
+      if (uses.length > 2) {
+        throw new RangeError('Generated geometry contains a non-manifold edge.');
+      }
+      edges.set(edgeKey, uses);
+    }
+  }
+
+  const adjacency: Neighbor[][] = Array.from({ length: triangleCount }, () => []);
+  for (const uses of edges.values()) {
+    if (uses.length !== 2) continue;
+    const [first, second] = uses;
+    const sameDirection = first.direction === second.direction;
+    adjacency[first.triangle].push({ triangle: second.triangle, sameDirection });
+    adjacency[second.triangle].push({ triangle: first.triangle, sameDirection });
+  }
+
+  const flipByTriangle: (boolean | undefined)[] = Array(triangleCount).fill(undefined);
+  const components: number[][] = [];
+  for (let seed = 0; seed < triangleCount; seed++) {
+    if (flipByTriangle[seed] !== undefined) continue;
+    flipByTriangle[seed] = false;
+    const component: number[] = [];
+    const pending = [seed];
+    while (pending.length > 0) {
+      const triangle = pending.pop()!;
+      component.push(triangle);
+      const flip = flipByTriangle[triangle]!;
+      for (const neighbor of adjacency[triangle]) {
+        const neighborFlip = neighbor.sameDirection ? !flip : flip;
+        const assigned = flipByTriangle[neighbor.triangle];
+        if (assigned === undefined) {
+          flipByTriangle[neighbor.triangle] = neighborFlip;
+          pending.push(neighbor.triangle);
+        } else if (assigned !== neighborFlip) {
+          throw new RangeError('Generated geometry has inconsistent triangle winding.');
+        }
+      }
+    }
+    components.push(component);
+  }
+
+  const orientedPositions = new Float32Array(positions.length);
+  for (let triangle = 0; triangle < triangleCount; triangle++) {
+    const offset = triangle * 9;
+    for (let index = 0; index < 9; index++) {
+      orientedPositions[offset + index] = positions[offset + index];
+    }
+    if (flipByTriangle[triangle]) {
+      for (let axis = 0; axis < 3; axis++) {
+        const second = orientedPositions[offset + 3 + axis];
+        orientedPositions[offset + 3 + axis] = orientedPositions[offset + 6 + axis];
+        orientedPositions[offset + 6 + axis] = second;
+      }
+    }
+  }
+
+  const normals = new Float32Array(positions.length);
+  for (let componentIndex = 0; componentIndex < components.length; componentIndex++) {
+    const component = components[componentIndex];
+    const reference: Point3 = [0, 0, 0];
+    for (const triangle of component) {
+      const offset = triangle * 9;
+      for (let vertex = 0; vertex < 3; vertex++) {
+        for (let axis = 0; axis < 3; axis++) {
+          reference[axis] += orientedPositions[offset + vertex * 3 + axis] / (component.length * 3);
+        }
+      }
+    }
+
+    let signedVolume = 0;
+    for (const triangle of component) {
+      const offset = triangle * 9;
+      const a: Point3 = [0, 1, 2].map(axis => orientedPositions[offset + axis] - reference[axis]) as Point3;
+      const b: Point3 = [0, 1, 2].map(axis => orientedPositions[offset + 3 + axis] - reference[axis]) as Point3;
+      const c: Point3 = [0, 1, 2].map(axis => orientedPositions[offset + 6 + axis] - reference[axis]) as Point3;
+      signedVolume += (
+        a[0] * (b[1] * c[2] - b[2] * c[1])
+        + a[1] * (b[2] * c[0] - b[0] * c[2])
+        + a[2] * (b[0] * c[1] - b[1] * c[0])
+      ) / 6;
+    }
+
+    if (signedVolume < 0) {
+      for (const triangle of component) {
+        const offset = triangle * 9;
+        for (let axis = 0; axis < 3; axis++) {
+          const second = orientedPositions[offset + 3 + axis];
+          orientedPositions[offset + 3 + axis] = orientedPositions[offset + 6 + axis];
+          orientedPositions[offset + 6 + axis] = second;
+        }
+      }
+    }
+  }
+
+  for (let offset = 0; offset < orientedPositions.length; offset += 9) {
+    const ab: Point3 = [
+      orientedPositions[offset + 3] - orientedPositions[offset],
+      orientedPositions[offset + 4] - orientedPositions[offset + 1],
+      orientedPositions[offset + 5] - orientedPositions[offset + 2]
+    ];
+    const ac: Point3 = [
+      orientedPositions[offset + 6] - orientedPositions[offset],
+      orientedPositions[offset + 7] - orientedPositions[offset + 1],
+      orientedPositions[offset + 8] - orientedPositions[offset + 2]
+    ];
+    const normal: Point3 = [
+      ab[1] * ac[2] - ab[2] * ac[1],
+      ab[2] * ac[0] - ab[0] * ac[2],
+      ab[0] * ac[1] - ab[1] * ac[0]
+    ];
+    const length = Math.hypot(...normal);
+    if (length > 1e-12) {
+      for (let axis = 0; axis < 3; axis++) {
+        normals[offset + axis] = normal[axis] / length;
+        normals[offset + 3 + axis] = normal[axis] / length;
+        normals[offset + 6 + axis] = normal[axis] / length;
+      }
+    }
+  }
+
+  return { positions: orientedPositions, normals };
+}
+
+/** Split triangle edges at existing collinear vertices to remove mesh T-junctions. */
+function conformTriangleMesh(
+  positions: number[],
+  normals: number[]
+): { positions: number[]; normals: number[] } {
+  const triangleCount = positions.length / 9;
+  if (triangleCount < 2) return { positions, normals };
+
+  const vertexByKey = new Map<string, Point3>();
+  const keyOf = (point: Point3) => point.map(value => Math.round(value * 1e4)).join(',');
+  const triangles: Array<{ points: [Point3, Point3, Point3]; normal: Point3 }> = [];
+  const edgeUse = new Map<string, number>();
+  const edgeKey = (a: Point3, b: Point3) => [keyOf(a), keyOf(b)].sort().join('|');
+
+  for (let offset = 0; offset < positions.length; offset += 9) {
+    const points = [
+      positions.slice(offset, offset + 3) as Point3,
+      positions.slice(offset + 3, offset + 6) as Point3,
+      positions.slice(offset + 6, offset + 9) as Point3
+    ] as [Point3, Point3, Point3];
+    const normal = normals.slice(offset, offset + 3) as Point3;
+    triangles.push({ points, normal });
+    for (const point of points) vertexByKey.set(keyOf(point), point);
+    for (let index = 0; index < 3; index++) {
+      const key = edgeKey(points[index], points[(index + 1) % 3]);
+      edgeUse.set(key, (edgeUse.get(key) ?? 0) + 1);
+    }
+  }
+
+  const unmatchedEdges = [...edgeUse.keys()].filter(key => edgeUse.get(key) === 1);
+  if (unmatchedEdges.length === 0) return { positions, normals };
+
+  const vertices = [...vertexByKey.values()];
+  const sortedByAxis = [0, 1, 2].map(axis => (
+    [...vertices].sort((a, b) => a[axis] - b[axis])
+  ));
+  const lowerBound = (values: Point3[], axis: number, target: number) => {
+    let low = 0;
+    let high = values.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (values[middle][axis] < target) low = middle + 1;
+      else high = middle;
+    }
+    return low;
   };
+  const edgeSplits = new Map<string, Point3[]>();
+  const tolerance = 1e-4;
+
+  for (const edge of unmatchedEdges) {
+    const [aKey, bKey] = edge.split('|');
+    const a = vertexByKey.get(aKey);
+    const b = vertexByKey.get(bKey);
+    if (!a || !b) continue;
+    const direction: Point3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const lengthSquared = direction.reduce((sum, value) => sum + value * value, 0);
+    if (lengthSquared < tolerance * tolerance) continue;
+    const axis = direction.reduce((best, value, index) => (
+      Math.abs(value) > Math.abs(direction[best]) ? index : best
+    ), 0);
+    const candidates = sortedByAxis[axis];
+    const minimum = Math.min(a[axis], b[axis]) + tolerance;
+    const maximum = Math.max(a[axis], b[axis]) - tolerance;
+    const splits: Array<{ t: number; point: Point3 }> = [];
+    for (let index = lowerBound(candidates, axis, minimum); index < candidates.length; index++) {
+      const point = candidates[index];
+      if (point[axis] > maximum) break;
+      const relative: Point3 = [point[0] - a[0], point[1] - a[1], point[2] - a[2]];
+      const t = relative.reduce((sum, value, component) => sum + value * direction[component], 0) / lengthSquared;
+      if (t <= 1e-6 || t >= 1 - 1e-6) continue;
+      const distance = Math.hypot(
+        relative[0] - t * direction[0],
+        relative[1] - t * direction[1],
+        relative[2] - t * direction[2]
+      );
+      if (distance <= tolerance) splits.push({ t, point });
+    }
+    if (splits.length > 0) {
+      splits.sort((first, second) => first.t - second.t);
+      edgeSplits.set(edge, splits.map(split => split.point));
+    }
+  }
+
+  if (edgeSplits.size === 0) return { positions, normals };
+
+  const conformedPositions: number[] = [];
+  const conformedNormals: number[] = [];
+  for (const { points, normal } of triangles) {
+    const boundary: Point3[] = [];
+    let hasSplit = false;
+    for (let index = 0; index < 3; index++) {
+      const start = points[index];
+      const end = points[(index + 1) % 3];
+      boundary.push(start);
+      const splits = edgeSplits.get(edgeKey(start, end)) ?? [];
+      if (splits.length > 0) {
+        hasSplit = true;
+        const direction: Point3 = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
+        const lengthSquared = direction.reduce((sum, value) => sum + value * value, 0);
+        splits.sort((first, second) => {
+          const firstT = (first[0] - start[0]) * direction[0]
+            + (first[1] - start[1]) * direction[1]
+            + (first[2] - start[2]) * direction[2];
+          const secondT = (second[0] - start[0]) * direction[0]
+            + (second[1] - start[1]) * direction[1]
+            + (second[2] - start[2]) * direction[2];
+          return firstT / lengthSquared - secondT / lengthSquared;
+        });
+        boundary.push(...splits);
+      }
+    }
+    if (!hasSplit) {
+      addTriangleFace(conformedPositions, conformedNormals, points[0], points[1], points[2], normal);
+      continue;
+    }
+
+    const center: Point3 = [
+      (points[0][0] + points[1][0] + points[2][0]) / 3,
+      (points[0][1] + points[1][1] + points[2][1]) / 3,
+      (points[0][2] + points[1][2] + points[2][2]) / 3
+    ];
+    for (let index = 0; index < boundary.length; index++) {
+      addTriangleFace(
+        conformedPositions,
+        conformedNormals,
+        center,
+        boundary[index],
+        boundary[(index + 1) % boundary.length],
+        normal
+      );
+    }
+  }
+  return { positions: conformedPositions, normals: conformedNormals };
+}
+
+/** Close simple planar gaps left by collapsed contour vertices in Earcut's output. */
+function closePlanarBoundaryLoops(
+  positions: number[],
+  normals: number[]
+): { positions: number[]; normals: number[] } {
+  type BoundaryEdge = { start: Point3; end: Point3; startKey: string; endKey: string };
+  const keyOf = (point: Point3) => point.map(value => Math.round(value * 1e4)).join(',');
+  const edges = new Map<string, { count: number; edge: BoundaryEdge }>();
+  for (let offset = 0; offset < positions.length; offset += 9) {
+    const points = [
+      positions.slice(offset, offset + 3) as Point3,
+      positions.slice(offset + 3, offset + 6) as Point3,
+      positions.slice(offset + 6, offset + 9) as Point3
+    ] as [Point3, Point3, Point3];
+    for (let index = 0; index < 3; index++) {
+      const start = points[index];
+      const end = points[(index + 1) % 3];
+      const startKey = keyOf(start);
+      const endKey = keyOf(end);
+      const key = [startKey, endKey].sort().join('|');
+      const entry = edges.get(key);
+      if (entry) entry.count++;
+      else edges.set(key, { count: 1, edge: { start, end, startKey, endKey } });
+    }
+  }
+
+  const openEdges = [...edges.values()].filter(entry => entry.count === 1).map(entry => entry.edge);
+  if (openEdges.length < 3) return { positions, normals };
+  const adjacency = new Map<string, { point: Point3; neighbors: Set<string> }>();
+  for (const edge of openEdges) {
+    const start = adjacency.get(edge.startKey) ?? { point: edge.start, neighbors: new Set<string>() };
+    const end = adjacency.get(edge.endKey) ?? { point: edge.end, neighbors: new Set<string>() };
+    start.neighbors.add(edge.endKey);
+    end.neighbors.add(edge.startKey);
+    adjacency.set(edge.startKey, start);
+    adjacency.set(edge.endKey, end);
+  }
+  const visited = new Set<BoundaryEdge>();
+  const visitedVertices = new Set<string>();
+  const allMeshVertices = [...new Map(
+    [...edges.values()].map(({ edge }) => [edge.startKey, edge.start] as const)
+  ).values()];
+  const meshCenter: Point3 = [0, 0, 0];
+  for (const point of allMeshVertices) {
+    meshCenter[0] += point[0] / allMeshVertices.length;
+    meshCenter[1] += point[1] / allMeshVertices.length;
+    meshCenter[2] += point[2] / allMeshVertices.length;
+  }
+  const positionsWithCaps = [...positions];
+  const normalsWithCaps = [...normals];
+
+  for (const first of openEdges) {
+    if (visited.has(first) || visitedVertices.has(first.startKey)) continue;
+    const component: BoundaryEdge[] = [];
+    const pending = [first.startKey];
+    const componentVertices = new Set<string>();
+    while (pending.length > 0) {
+      const currentKey = pending.pop()!;
+      if (componentVertices.has(currentKey)) continue;
+      componentVertices.add(currentKey);
+      for (const neighbor of adjacency.get(currentKey)?.neighbors ?? []) pending.push(neighbor);
+    }
+    for (const edge of openEdges) {
+      if (componentVertices.has(edge.startKey) && componentVertices.has(edge.endKey)) {
+        component.push(edge);
+        visited.add(edge);
+      }
+    }
+    componentVertices.forEach(key => visitedVertices.add(key));
+    if (component.length < 3 || [...componentVertices].some(key => adjacency.get(key)?.neighbors.size !== 2)) continue;
+
+    const firstKey = component[0].startKey;
+    const contour: Point3[] = [];
+    let currentKey = firstKey;
+    let previousKey: string | null = null;
+    do {
+      const vertex = adjacency.get(currentKey);
+      if (!vertex) break;
+      contour.push(vertex.point);
+      const nextKey = [...vertex.neighbors].find(key => key !== previousKey);
+      if (!nextKey) break;
+      previousKey = currentKey;
+      currentKey = nextKey;
+    } while (currentKey !== firstKey && contour.length <= component.length);
+    if (currentKey !== firstKey || contour.length !== component.length) continue;
+
+    const newell: Point3 = [0, 0, 0];
+    for (let index = 0; index < contour.length; index++) {
+      const current = contour[index];
+      const next = contour[(index + 1) % contour.length];
+      newell[0] += (current[1] - next[1]) * (current[2] + next[2]);
+      newell[1] += (current[2] - next[2]) * (current[0] + next[0]);
+      newell[2] += (current[0] - next[0]) * (current[1] + next[1]);
+    }
+    const length = Math.hypot(...newell);
+    if (length < 1e-8) continue;
+    let boundaryNormal: Point3 = newell.map(value => value / length) as Point3;
+    const origin = contour[0];
+    if (contour.some(point => (
+      Math.abs(
+        (point[0] - origin[0]) * boundaryNormal[0]
+        + (point[1] - origin[1]) * boundaryNormal[1]
+        + (point[2] - origin[2]) * boundaryNormal[2]
+      ) > 1e-4
+    ))) continue;
+
+    const loopCenter: Point3 = [0, 0, 0];
+    for (const point of contour) {
+      loopCenter[0] += point[0] / contour.length;
+      loopCenter[1] += point[1] / contour.length;
+      loopCenter[2] += point[2] / contour.length;
+    }
+    const outward: Point3 = [
+      loopCenter[0] - meshCenter[0],
+      loopCenter[1] - meshCenter[1],
+      loopCenter[2] - meshCenter[2]
+    ];
+    if (outward[0] * boundaryNormal[0] + outward[1] * boundaryNormal[1] + outward[2] * boundaryNormal[2] < 0) {
+      boundaryNormal = boundaryNormal.map(value => -value) as Point3;
+    }
+
+    const droppedAxis = boundaryNormal.reduce((best, value, index) => (
+      Math.abs(value) > Math.abs(boundaryNormal[best]) ? index : best
+    ), 0);
+    const contour2D = contour.map(point => {
+      if (droppedAxis === 0) return new Vector2(point[1], point[2]);
+      if (droppedAxis === 1) return new Vector2(point[0], point[2]);
+      return new Vector2(point[0], point[1]);
+    });
+    const triangles = ShapeUtils.triangulateShape(contour2D, []);
+    const fillNormal: Point3 = boundaryNormal.map(value => -value) as Point3;
+    for (const triangle of triangles) {
+      const [a, b, c] = triangle.map(index => contour[index]);
+      addTriangleFace(positionsWithCaps, normalsWithCaps, a, b, c, fillNormal);
+    }
+  }
+  return { positions: positionsWithCaps, normals: normalsWithCaps };
+}
+
+function segmentJointTypes(params: FrameParams, index: number, count: number, hex = false): [string, string] {
+  const jointType = hex && params.jointType === 'bowtie' ? 'half-lap' : params.jointType;
+  if (hex) {
+    const start = index === 0
+      ? 'miter'
+      : jointType === 'half-lap' ? 'half-lap-female' : 'dovetail-female';
+    const end = index === count - 1
+      ? 'miter'
+      : jointType === 'half-lap' ? 'half-lap-male' : 'dovetail-male';
+    return [start, end];
+  }
+
+  const start = index === 0
+    ? jointType === 'bowtie' ? 'miter-bowtie' : 'miter'
+    : jointType === 'half-lap' ? 'half-lap-female'
+      : jointType === 'dovetail' ? 'dovetail-female' : 'flat-bowtie';
+  const end = index === count - 1
+    ? jointType === 'bowtie' ? 'miter-bowtie' : 'miter'
+    : jointType === 'half-lap' ? 'half-lap-male'
+      : jointType === 'dovetail' ? 'dovetail-male' : 'flat-bowtie';
+  return [start, end];
+}
+
+function getSegmentLongitudinalSpan(positions: number[]): number {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (let index = 0; index < positions.length; index += 3) {
+    min = Math.min(min, positions[index]);
+    max = Math.max(max, positions[index]);
+  }
+  return max - min;
+}
+
+function createSafeSegmentBoundaries(
+  length: number,
+  params: FrameParams,
+  W: number,
+  centers: Array<{ cx: number; cy: number }>,
+  side: 'top' | 'bottom' | 'left' | 'right',
+  wOut: number,
+  lOut: number,
+  hex = false
+): number[] {
+  const effectiveJoint = hex && params.jointType === 'bowtie' ? 'half-lap' : params.jointType;
+  const jointAllowance = effectiveJoint === 'half-lap' ? 7.5 : effectiveJoint === 'dovetail' ? 8.25 : 0;
+  const maxNominalSpan = params.maxPartLength - jointAllowance - 0.25;
+  if (maxNominalSpan <= 1) {
+    throw new RangeError('Maximum part length is too small for the selected joint.');
+  }
+
+  const localHangers = params.hangerEnabled && !hex && side === params.hangerSide
+    ? mapHangerCentersToRail(centers, side, wOut, lOut)
+    : [];
+  const hangerRadius = Math.max(0, Math.min(params.hangerDiameter, params.tBorder - 2) / 2);
+  const jointDepth = effectiveJoint === 'half-lap' ? 7.5
+    : effectiveJoint === 'dovetail' ? 8
+      : getBowtieDims(W, params.height).L_bowtie / 2;
+  const seamClearance = hangerRadius + jointDepth + 1;
+  const keepouts = localHangers.map(({ u }) => u);
+  const cornerClearance = !hex && params.jointType === 'bowtie' ? W + 0.5 : 0;
+  const seamPlan = planSafeSplitBoundaries({
+    length,
+    maxPartLength: params.maxPartLength,
+    maxNominalSpan,
+    keepouts,
+    seamClearance,
+    cornerClearance
+  });
+
+  for (const boundaries of seamPlan.plans) {
+    if (!boundaries) continue;
+    const count = boundaries.length - 1;
+    const actualFits = boundaries.slice(1).every((end, index) => {
+      const [startJoint, endJoint] = segmentJointTypes(params, index, count, hex);
+      const mesh = generateSegmentMesh(
+        params,
+        W,
+        boundaries[index],
+        end,
+        startJoint,
+        endJoint,
+        side,
+        centers,
+        wOut,
+        lOut
+      );
+      return getSegmentLongitudinalSpan(mesh.positions) <= params.maxPartLength + 1e-5;
+    });
+    if (actualFits) return boundaries;
+  }
+
+  if (seamPlan.hangerAndCornerBlocked && seamPlan.plans.every(plan => plan === null)) {
+    throw new RangeError('The selected hanger side has no safe split seam between the bowtie corner joints. Increase that frame dimension, reduce hanger diameter or count, or choose a different joint.');
+  }
+  throw new RangeError('Unable to split the frame into parts within the requested maximum length.');
 }
 
 // Generates the geometry for all parts of a split frame
 export function generateSplitFrameParts(params: FrameParams): SplitPart[] {
+  const validationErrors = validateFrameParams(params);
+  if (validationErrors.length > 0) {
+    throw new RangeError(validationErrors.join(' '));
+  }
+  if (!Number.isFinite(params.maxPartLength) || params.maxPartLength <= 0) {
+    throw new RangeError('Maximum part length must be a positive finite number.');
+  }
+  if (params.shape === 'rect' && params.cornerRadius > 0) {
+    throw new RangeError('Rounded corners are not supported when splitting a rectangular frame.');
+  }
+
   if (params.shape === 'hex') {
-    const wPocket = params.wPic + 2 * params.clearance;
-    const wOut = wPocket + 2 * params.tBorder;
+    const dimensions = getEffectiveFrameDimensions(params);
+    const wPocket = dimensions.pocketWidth;
+    const wOut = dimensions.outerWidth;
     const maxShelf = wPocket / 2 - 2;
     const actualShelf = Math.min(params.sShelf, maxShelf);
     const W = params.tBorder + actualShelf;
@@ -979,14 +1380,12 @@ export function generateSplitFrameParts(params: FrameParams): SplitPart[] {
     const polyOut = getHexagonPolygon(wOut);
     const L = wOut / Math.sqrt(3); // side length
 
-    const N = Math.max(1, Math.ceil(L / params.maxPartLength));
-    const L_seg = L / N;
-
-    // Enforce no bowtie for hex
-    const jointType = params.jointType === 'bowtie' ? 'half-lap' : params.jointType;
-
     const parts: SplitPart[] = [];
     const centers = hangerCenters(params);
+    const boundaries = createSafeSegmentBoundaries(
+      L, params, W, centers, 'top', wOut, wOut, true
+    );
+    const N = boundaries.length - 1;
 
     for (let sideIdx = 0; sideIdx < 6; sideIdx++) {
       const nextIdx = (sideIdx + 1) % 6;
@@ -1000,25 +1399,9 @@ export function generateSplitFrameParts(params: FrameParams): SplitPart[] {
       const dir_v = [-dir_u[1], dir_u[0]];
 
       for (let i = 0; i < N; i++) {
-        const u1 = i * L_seg;
-        const u2 = (i + 1) * L_seg;
-
-        let startJoint = 'flat';
-        let endJoint = 'flat';
-
-        if (i === 0) {
-          startJoint = 'miter';
-        } else {
-          if (jointType === 'half-lap') startJoint = 'half-lap-female';
-          else if (jointType === 'dovetail') startJoint = 'dovetail-female';
-        }
-
-        if (i === N - 1) {
-          endJoint = 'miter';
-        } else {
-          if (jointType === 'half-lap') endJoint = 'half-lap-male';
-          else if (jointType === 'dovetail') endJoint = 'dovetail-male';
-        }
+        const u1 = boundaries[i];
+        const u2 = boundaries[i + 1];
+        const [startJoint, endJoint] = segmentJointTypes(params, i, N, true);
 
         const segmentMesh = generateSegmentMesh(
           params, W, u1, u2, startJoint, endJoint, 'top', centers, L, wOut
@@ -1064,20 +1447,22 @@ export function generateSplitFrameParts(params: FrameParams): SplitPart[] {
 
         const sideLabel = `Side ${sideIdx + 1}`;
         const segmentLabel = N > 1 ? ` - Part ${i + 1}` : '';
+        const orientedMesh = orientTriangleMesh(positions);
         parts.push({
           name: `${sideLabel}${segmentLabel}`,
-          positions,
-          normals
+          positions: orientedMesh.positions,
+          normals: orientedMesh.normals
         });
       }
     }
     return parts;
   }
 
-  const wPocket = params.wPic + 2 * params.clearance;
-  const lPocket = params.lPic + 2 * params.clearance;
-  const wOut = wPocket + 2 * params.tBorder;
-  const lOut = lPocket + 2 * params.tBorder;
+  const dimensions = getEffectiveFrameDimensions(params);
+  const wPocket = dimensions.pocketWidth;
+  const lPocket = dimensions.pocketLength;
+  const wOut = dimensions.outerWidth;
+  const lOut = dimensions.outerLength;
   
   const maxShelf = Math.min(wPocket, lPocket) / 2 - 2;
   const actualShelf = Math.min(params.sShelf, maxShelf);
@@ -1097,32 +1482,13 @@ export function generateSplitFrameParts(params: FrameParams): SplitPart[] {
   ];
 
   sides.forEach(({ side, L }) => {
-    const N = Math.max(1, Math.ceil(L / params.maxPartLength));
-    const L_seg = L / N;
+    const boundaries = createSafeSegmentBoundaries(L, params, W, centers, side, wOut, lOut);
+    const N = boundaries.length - 1;
 
     for (let i = 0; i < N; i++) {
-      const u1 = i * L_seg;
-      const u2 = (i + 1) * L_seg;
-
-      // Determine joint types at start and end of this segment
-      let startJoint: string = 'flat';
-      let endJoint: string = 'flat';
-
-      if (i === 0) {
-        startJoint = params.jointType === 'bowtie' ? 'miter-bowtie' : 'miter';
-      } else {
-        if (params.jointType === 'half-lap') startJoint = 'half-lap-female';
-        else if (params.jointType === 'dovetail') startJoint = 'dovetail-female';
-        else if (params.jointType === 'bowtie') startJoint = 'flat-bowtie';
-      }
-
-      if (i === N - 1) {
-        endJoint = params.jointType === 'bowtie' ? 'miter-bowtie' : 'miter';
-      } else {
-        if (params.jointType === 'half-lap') endJoint = 'half-lap-male';
-        else if (params.jointType === 'dovetail') endJoint = 'dovetail-male';
-        else if (params.jointType === 'bowtie') endJoint = 'flat-bowtie';
-      }
+      const u1 = boundaries[i];
+      const u2 = boundaries[i + 1];
+      const [startJoint, endJoint] = segmentJointTypes(params, i, N);
 
       const segmentMesh = generateSegmentMesh(
         params, W, u1, u2, startJoint, endJoint, side, centers, wOut, lOut
@@ -1133,10 +1499,11 @@ export function generateSplitFrameParts(params: FrameParams): SplitPart[] {
       // Name parts intuitively
       const sideNameMap = { top: 'Top', bottom: 'Bottom', left: 'Left', right: 'Right' };
       const segmentLabel = N > 1 ? ` - Part ${i + 1}` : '';
+      const orientedMesh = orientTriangleMesh(globalMesh.positions);
       parts.push({
         name: `${sideNameMap[side]}${segmentLabel}`,
-        positions: globalMesh.positions,
-        normals: globalMesh.normals
+        positions: orientedMesh.positions,
+        normals: orientedMesh.normals
       });
     }
   });
@@ -1144,61 +1511,29 @@ export function generateSplitFrameParts(params: FrameParams): SplitPart[] {
   return parts;
 }
 
-// Generate hanger hole centers using internal logic matching getHangerHoles
 function hangerCenters(params: FrameParams) {
-  const centers: Array<{ cx: number; cy: number }> = [];
-  if (!params.hangerEnabled) return centers;
-  const count = params.hangerCount;
-  const side = params.hangerSide;
+  const dimensions = getEffectiveFrameDimensions(params);
+  return getHangerHoles(
+    params,
+    dimensions.outerWidth,
+    dimensions.outerLength,
+    dimensions.pocketWidth,
+    dimensions.pocketLength
+  );
+}
 
-  const getHangerHolesInternal = () => {
-    const wPocketL = params.wPic + 2 * params.clearance;
-    const lPocketL = params.lPic + 2 * params.clearance;
-    const wOutL = wPocketL + 2 * params.tBorder;
-    const lOutL = lPocketL + 2 * params.tBorder;
-
-    const offsetVal = params.tBorder / 2;
-    if (side === 'top') {
-      const cy = lOutL / 2 - offsetVal;
-      if (count === 1) {
-        centers.push({ cx: 0, cy });
-      } else {
-        const dist = Math.min(120, wPocketL * 0.6);
-        centers.push({ cx: -dist / 2, cy });
-        centers.push({ cx: dist / 2, cy });
-      }
-    } else if (side === 'bottom') {
-      const cy = -lOutL / 2 + offsetVal;
-      if (count === 1) {
-        centers.push({ cx: 0, cy });
-      } else {
-        const dist = Math.min(120, wPocketL * 0.6);
-        centers.push({ cx: -dist / 2, cy });
-        centers.push({ cx: dist / 2, cy });
-      }
-    } else if (side === 'left') {
-      const cx = -wOutL / 2 + offsetVal;
-      if (count === 1) {
-        centers.push({ cx, cy: 0 });
-      } else {
-        const dist = Math.min(120, lPocketL * 0.6);
-        centers.push({ cx, cy: -dist / 2 });
-        centers.push({ cx, cy: dist / 2 });
-      }
-    } else { // right
-      const cx = wOutL / 2 - offsetVal;
-      if (count === 1) {
-        centers.push({ cx, cy: 0 });
-      } else {
-        const dist = Math.min(120, lPocketL * 0.6);
-        centers.push({ cx, cy: -dist / 2 });
-        centers.push({ cx, cy: dist / 2 });
-      }
-    }
-  };
-
-  getHangerHolesInternal();
-  return centers;
+function mapHangerCentersToRail(
+  centers: Array<{ cx: number; cy: number }>,
+  side: 'top' | 'bottom' | 'left' | 'right',
+  wOut: number,
+  lOut: number
+): Array<{ u: number; v: number }> {
+  return centers.map(({ cx, cy }) => {
+    if (side === 'top') return { u: cx + wOut / 2, v: lOut / 2 - cy };
+    if (side === 'bottom') return { u: wOut / 2 - cx, v: cy + lOut / 2 };
+    if (side === 'left') return { u: cy + lOut / 2, v: cx + wOut / 2 };
+    return { u: lOut / 2 - cy, v: wOut / 2 - cx };
+  });
 }
 
 // Generate the local coordinates mesh for a single rail segment
@@ -1219,15 +1554,31 @@ function generateSegmentMesh(
 
   const H = params.height;
   const hShelf = Math.max(0.2, params.height - params.dPocket);
+  const halfLapHeight = params.jointType === 'half-lap' && hShelf <= H / 2
+    ? Math.max(0.5, hShelf - 0.5)
+    : H / 2;
+  const profileMidHeight = params.jointType === 'half-lap'
+    ? halfLapHeight
+    : Math.min(H / 2, hShelf);
   const tBorder = params.tBorder;
   const L_lap = 15;
-  const { L_bowtie, wEnds, wNeck, dBowtie } = getBowtieDims(W, H);
+  const { L_bowtie, wEnds, wNeck, dBowtie } = getBowtieDims(W, H, params.height - params.dPocket - 0.5);
   const L_dove = 8;
+  const hangerDiameter = Math.min(params.hangerDiameter, tBorder - 2);
+  const localHangers = params.hangerEnabled && side === params.hangerSide
+    ? mapHangerCentersToRail(centers, side, wOut, lOut).filter(({ u, v }) => (
+      u >= u1 && u <= u2 && v >= hangerDiameter / 2 && v <= tBorder - hangerDiameter / 2
+    ))
+    : [];
+  const segmentHangers = localHangers.filter(({ u }) => u >= u1 && u < u2);
 
   const hasBowtieStart = startJoint === 'flat-bowtie' || startJoint === 'miter-bowtie';
   const hasBowtieEnd = endJoint === 'flat-bowtie' || endJoint === 'miter-bowtie';
 
   const Y_set = new Set<number>([0, tBorder, W]);
+  for (const hanger of segmentHangers) {
+    for (const point of getCirclePolygon(hanger.u, hanger.v, hangerDiameter)) Y_set.add(point[1]);
+  }
   const addPocketSplits = (jointTypeStr: string) => {
     if (jointTypeStr === 'flat-bowtie') {
       const y1 = W / 2 - wEnds / 2;
@@ -1399,6 +1750,7 @@ function generateSegmentMesh(
     const nx = e1[1] * e2[2] - e1[2] * e2[1];
     const ny = e1[2] * e2[0] - e1[0] * e2[2];
     const nz = e1[0] * e2[1] - e1[1] * e2[0];
+    if (Math.hypot(nx, ny, nz) < 1e-10) return;
     const dot = nx * n[0] + ny * n[1] + nz * n[2];
     if (dot < 0) {
       positions.push(...v0, ...v2, ...v1);
@@ -1422,13 +1774,14 @@ function generateSegmentMesh(
   // Helper to build 2D profiles using 6 rows to allow sharp vertical step in half-lap and dBowtie T-junction prevention
   const getProfilePoints = (uVal: number, joint: string, isEnd: boolean) => {
     const yArr = [0, tBorder, W];
-    const zArr = [0, dBowtie, H / 2, H / 2, hShelf, H];
+    const zArr = [0, dBowtie, profileMidHeight, profileMidHeight, hShelf, H];
     const pts: Array<Array<[number, number, number]>> = []; // [col][row]
     for (let c = 0; c < 3; c++) {
       pts[c] = [];
       const y = yArr[c];
       for (let r = 0; r < 6; r++) {
         let z = zArr[r];
+        if (c === 0 && r === 4) z = Math.max(hShelf, profileMidHeight);
         if (c === 2 && r === 5) z = hShelf; // clamp top row for inner hole to shelf height
         // Row 0, 1, 2 are bottom half. Row 3, 4, 5 are top half.
         const isTopHalf = r >= 3;
@@ -1473,7 +1826,6 @@ function generateSegmentMesh(
     const q2 = [pts[0][3], pts[1][3], pts[1][4], pts[0][4]] as Array<[number, number, number]>;
     const q3 = [pts[0][4], pts[1][4], pts[1][5], pts[0][5]] as Array<[number, number, number]>;
     const q5 = [pts[1][3], pts[2][3], pts[2][4], pts[1][4]] as Array<[number, number, number]>;
-
     addCapQ(q2);
     addCapQ(q3);
     addCapQ(q5);
@@ -1614,7 +1966,8 @@ function generateSegmentMesh(
       }
     }
 
-    if (params.jointType === 'bowtie') {
+    const touchesBowtiePocket = Math.min(pStart1[2], pStart2[2], pEnd1[2], pEnd2[2]) <= dBowtie + 1e-6;
+    if (params.jointType === 'bowtie' && touchesBowtiePocket) {
       const y1 = pStart1[1];
       const y2 = pStart2[1];
 
@@ -1722,8 +2075,18 @@ function generateSegmentMesh(
   };
 
   if (!hasBowtieStart && !hasBowtieEnd) {
-    addLongQ(0, 0, 1, 0, [0, 0, -1]);
-    addLongQ(1, 0, 2, 0, [0, 0, -1]);
+    const bottomContour: [number, number][] = [
+      [startPts[0][0][0], startPts[0][0][1]],
+      [endPts[0][0][0], endPts[0][0][1]],
+      [endPts[1][0][0], endPts[1][0][1]],
+      [endPts[2][0][0], endPts[2][0][1]],
+      [startPts[2][0][0], startPts[2][0][1]],
+      [startPts[1][0][0], startPts[1][0][1]]
+    ];
+    const hangerOpenings = segmentHangers.map(hanger => (
+      getCirclePolygon(hanger.u, hanger.v, hangerDiameter)
+    ));
+    addPolygonFaceWithHoles(positions, normals, bottomContour, hangerOpenings, 0, [0, 0, -1]);
   } else {
     const u_start = (y: number) => {
       if (startJoint === 'miter' || startJoint === 'miter-bowtie') {
@@ -1750,14 +2113,11 @@ function generateSegmentMesh(
         const uMid = u1 + L_bowtie / 2;
 
         if (y >= y1 && y <= y4) {
-          let p_L = u1;
-          if (y < y2) {
-            p_L = u1 + (y - y2) * (uMid - u1) / (y1 - y2);
-          } else if (y > y3) {
-            p_L = u1 + (y - y3) * (uMid - u1) / (y4 - y3);
-          } else {
-            p_L = u1;
-          }
+          const p_L = y < y2
+            ? u1 + (y - y2) * (uMid - u1) / (y1 - y2)
+            : y > y3
+              ? u1 + (y - y3) * (uMid - u1) / (y4 - y3)
+              : u1;
           const inPocket = y > y1 && y < y4;
           return { p_L, p_R: uMid, inPocket };
         }
@@ -1783,16 +2143,12 @@ function generateSegmentMesh(
         const c2_x = C_u + dx_perp + dx_ends;
 
         if (y >= c3_y && y <= c1_y) {
-          let p_L = u_start(y);
-          if (y < c0_y) {
-            p_L = c3_x + (y - c3_y) * (c0_x - c3_x) / (c0_y - c3_y);
-          }
-          let p_R = c2_x;
-          if (y < c2_y) {
-            p_R = c3_x + (y - c3_y) * (c2_x - c3_x) / (c2_y - c3_y);
-          } else {
-            p_R = c2_x + (y - c2_y) * (c1_x - c2_x) / (c1_y - c2_y);
-          }
+          const p_L = y < c0_y
+            ? c3_x + (y - c3_y) * (c0_x - c3_x) / (c0_y - c3_y)
+            : u_start(y);
+          const p_R = y < c2_y
+            ? c3_x + (y - c3_y) * (c2_x - c3_x) / (c2_y - c3_y)
+            : c2_x + (y - c2_y) * (c1_x - c2_x) / (c1_y - c2_y);
           const inPocket = y > c3_y && y <= c1_y;
           return { p_L, p_R, inPocket };
         }
@@ -1811,14 +2167,11 @@ function generateSegmentMesh(
         const uMid = u2 - L_bowtie / 2;
 
         if (y >= y1 && y <= y4) {
-          let p_R = u2;
-          if (y < y2) {
-            p_R = u2 + (y - y2) * (uMid - u2) / (y1 - y2);
-          } else if (y > y3) {
-            p_R = u2 + (y - y3) * (uMid - u2) / (y4 - y3);
-          } else {
-            p_R = u2;
-          }
+          const p_R = y < y2
+            ? u2 + (y - y2) * (uMid - u2) / (y1 - y2)
+            : y > y3
+              ? u2 + (y - y3) * (uMid - u2) / (y4 - y3)
+              : u2;
           const inPocket = y > y1 && y < y4;
           return { p_L: uMid, p_R, inPocket };
         }
@@ -1844,21 +2197,40 @@ function generateSegmentMesh(
         const c2_x = C_u - dx_perp - dx_ends;
 
         if (y >= c3_y && y <= c1_y) {
-          let p_L = c2_x;
-          if (y < c2_y) {
-            p_L = c3_x + (y - c3_y) * (c2_x - c3_x) / (c2_y - c3_y);
-          } else {
-            p_L = c2_x + (y - c2_y) * (c1_x - c2_x) / (c1_y - c2_y);
-          }
-          let p_R = u_end(y);
-          if (y < c0_y) {
-            p_R = c3_x + (y - c3_y) * (c0_x - c3_x) / (c0_y - c3_y);
-          }
+          const p_L = y < c2_y
+            ? c3_x + (y - c3_y) * (c2_x - c3_x) / (c2_y - c3_y)
+            : c2_x + (y - c2_y) * (c1_x - c2_x) / (c1_y - c2_y);
+          const p_R = y < c0_y
+            ? c3_x + (y - c3_y) * (c0_x - c3_x) / (c0_y - c3_y)
+            : u_end(y);
           const inPocket = y > c3_y && y <= c1_y;
           return { p_L, p_R, inPocket };
         }
       }
       return { p_L: u_end(y), p_R: u_end(y), inPocket: false };
+    };
+
+    const addSolidQuadRaw = (
+      uL_low: number, uR_low: number, y_low: number,
+      uL_high: number, uR_high: number, y_high: number
+    ) => {
+      const p00 = [uL_low, y_low, 0] as [number, number, number];
+      const p10 = [uR_low, y_low, 0] as [number, number, number];
+      const p11 = [uR_high, y_high, 0] as [number, number, number];
+      const p01 = [uL_high, y_high, 0] as [number, number, number];
+
+      const lowCollapsed = Math.abs(uL_low - uR_low) < 1e-5;
+      const highCollapsed = Math.abs(uL_high - uR_high) < 1e-5;
+
+      if (lowCollapsed && highCollapsed) return;
+
+      if (lowCollapsed) {
+        addTri(p00, p11, p01, [0, 0, -1]);
+      } else if (highCollapsed) {
+        addTri(p00, p10, p01, [0, 0, -1]);
+      } else {
+        addQ(p00, p10, p11, p01, [0, 0, -1]);
+      }
     };
 
     const addSolidQuad = (
@@ -1883,29 +2255,79 @@ function generateSegmentMesh(
         const inHigh = uSplit_high > uL_high + 1e-5 && uSplit_high < uR_high - 1e-5;
 
         if (inLow || inHigh) {
-          addSolidQuad(uL_low, uSplit_low, y_low, uL_high, uSplit_high, y_high);
-          addSolidQuad(uSplit_low, uR_low, y_low, uSplit_high, uR_high, y_high);
+          const splitLow = Math.max(uL_low, Math.min(uR_low, uSplit_low));
+          const splitHigh = Math.max(uL_high, Math.min(uR_high, uSplit_high));
+          addSolidQuad(uL_low, splitLow, y_low, uL_high, splitHigh, y_high);
+          addSolidQuad(splitLow, uR_low, y_low, splitHigh, uR_high, y_high);
           return;
         }
       }
 
-      const p00 = [uL_low, y_low, 0] as [number, number, number];
-      const p10 = [uR_low, y_low, 0] as [number, number, number];
-      const p11 = [uR_high, y_high, 0] as [number, number, number];
-      const p01 = [uL_high, y_high, 0] as [number, number, number];
-
-      const lowCollapsed = Math.abs(uL_low - uR_low) < 1e-5;
-      const highCollapsed = Math.abs(uL_high - uR_high) < 1e-5;
-
-      if (lowCollapsed && highCollapsed) return;
-
-      if (lowCollapsed) {
-        addTri(p00, p11, p01, [0, 0, -1]);
-      } else if (highCollapsed) {
-        addTri(p00, p10, p01, [0, 0, -1]);
-      } else {
-        addQ(p00, p10, p11, p01, [0, 0, -1]);
+      if (segmentHangers.length === 0) {
+        addSolidQuadRaw(uL_low, uR_low, y_low, uL_high, uR_high, y_high);
+        return;
       }
+
+      const y_mid = (y_low + y_high) / 2;
+      const holeSlices = [] as Array<{
+        center: number;
+        leftLow: number;
+        leftHigh: number;
+        rightLow: number;
+        rightHigh: number;
+      }>;
+      for (const hanger of segmentHangers) {
+        const polygon = getCirclePolygon(hanger.u, hanger.v, hangerDiameter);
+        const minY = Math.min(...polygon.map(point => point[1]));
+        const maxY = Math.max(...polygon.map(point => point[1]));
+        if (y_mid <= minY || y_mid >= maxY) continue;
+
+        const intersections = [] as Array<{ xMid: number; xLow: number; xHigh: number }>;
+        for (let pointIndex = 0; pointIndex < polygon.length; pointIndex++) {
+          const p1 = polygon[pointIndex];
+          const p2 = polygon[(pointIndex + 1) % polygon.length];
+          if (y_mid <= Math.min(p1[1], p2[1]) || y_mid >= Math.max(p1[1], p2[1])) continue;
+          const xAt = (y: number) => p1[0] + ((y - p1[1]) * (p2[0] - p1[0])) / (p2[1] - p1[1]);
+          intersections.push({ xMid: xAt(y_mid), xLow: xAt(y_low), xHigh: xAt(y_high) });
+        }
+        intersections.sort((a, b) => a.xMid - b.xMid);
+        if (intersections.length !== 2) continue;
+
+        const [left, right] = intersections;
+        const tMid = (y_mid - y_low) / (y_high - y_low);
+        const regionLeftMid = uL_low + tMid * (uL_high - uL_low);
+        const regionRightMid = uR_low + tMid * (uR_high - uR_low);
+        const fullyInside = left.xMid >= regionLeftMid - 1e-5
+          && right.xMid <= regionRightMid + 1e-5
+          && left.xLow >= uL_low - 1e-5
+          && right.xLow <= uR_low + 1e-5
+          && left.xHigh >= uL_high - 1e-5
+          && right.xHigh <= uR_high + 1e-5;
+        if (fullyInside) {
+          holeSlices.push({
+            center: (left.xMid + right.xMid) / 2,
+            leftLow: left.xLow,
+            leftHigh: left.xHigh,
+            rightLow: right.xLow,
+            rightHigh: right.xHigh
+          });
+        }
+      }
+
+      if (holeSlices.length === 0) {
+        addSolidQuadRaw(uL_low, uR_low, y_low, uL_high, uR_high, y_high);
+        return;
+      }
+
+      holeSlices.sort((a, b) => a.center - b.center);
+      let leftLow = uL_low;
+      let leftHigh = uL_high;
+      for (const hole of holeSlices) {
+        addSolidQuadRaw(leftLow, hole.leftLow, y_low, leftHigh, hole.leftHigh, y_high);
+        leftLow = hole.rightLow;
+        leftHigh = hole.rightHigh;
+      }
+      addSolidQuadRaw(leftLow, uR_low, y_low, leftHigh, uR_high, y_high);
     };
 
     const addPocketCeilingQuad = (uL_low: number, uR_low: number, y_low: number, uL_high: number, uR_high: number, y_high: number) => {
@@ -2058,8 +2480,8 @@ function generateSegmentMesh(
   // 3. Exposed step faces for half-lap joint
   const addStepFace = (uStartStep: number, uEndStep: number, up: boolean) => {
     const norm: [number, number, number] = up ? [0, 0, 1] : [0, 0, -1];
-    addQ([uStartStep, 0, H/2], [uEndStep, 0, H/2], [uEndStep, tBorder, H/2], [uStartStep, tBorder, H/2], norm);
-    addQ([uStartStep, tBorder, H/2], [uEndStep, tBorder, H/2], [uEndStep, W, H/2], [uStartStep, W, H/2], norm);
+    addQ([uStartStep, 0, halfLapHeight], [uEndStep, 0, halfLapHeight], [uEndStep, tBorder, halfLapHeight], [uStartStep, tBorder, halfLapHeight], norm);
+    addQ([uStartStep, tBorder, halfLapHeight], [uEndStep, tBorder, halfLapHeight], [uEndStep, W, halfLapHeight], [uStartStep, W, halfLapHeight], norm);
   };
 
   if (startJoint.startsWith('half-lap-')) {
@@ -2085,45 +2507,16 @@ function generateSegmentMesh(
   }
 
   // 4. Subtract cylindrical hanger hole if it sits inside this segment
-  if (params.hangerEnabled) {
+  if (params.hangerEnabled && params.tBorder > 4 && params.height > 4) {
     const depth = Math.min(params.height - 2, 8);
-    const S = Math.min(params.hangerDiameter, params.tBorder - 2);
-    const D = S;
-
-    centers.forEach((c) => {
-      // Map global hanger coordinates to local segment coords
-      // Top Rail: Global X = u - L/2, Y = lOut/2 - v, Z = 0
-      // So: u = X + L/2, v = lOut/2 - Y
-      let localU = 0;
-      let localV = 0;
-      let isMatch = false;
-
-      if (side === 'top') {
-        localU = c.cx + wOut / 2;
-        localV = lOut / 2 - c.cy;
-        isMatch = true;
-      } else if (side === 'bottom') {
-        localU = wOut / 2 - c.cx;
-        localV = c.cy + lOut / 2;
-        isMatch = true;
-      } else if (side === 'left') {
-        localU = c.cy + lOut / 2;
-        localV = c.cx + wOut / 2;
-        isMatch = true;
-      } else if (side === 'right') {
-        localU = lOut / 2 - c.cy;
-        localV = wOut / 2 - c.cx;
-        isMatch = true;
-      }
-
-      // Check if hanger is inside this segment
-      if (isMatch && localU >= u1 && localU < u2 && localV >= 0 && localV <= W) {
-        addCylindricalHole(positions, normals, localU, localV, S, D, depth, 0, true);
-      }
+    segmentHangers.forEach(({ u, v }) => {
+      addCylindricalHole(positions, normals, u, v, hangerDiameter, depth, 0, true);
     });
   }
 
-  return { positions, normals };
+  const conformedMesh = conformTriangleMesh(positions, normals);
+  const closedMesh = closePlanarBoundaryLoops(conformedMesh.positions, conformedMesh.normals);
+  return conformTriangleMesh(closedMesh.positions, closedMesh.normals);
 }
 
 // Map local segment positions & normals to global coordinates
@@ -2139,36 +2532,16 @@ function transformLocalToGlobal(
   const normals = new Float32Array(localNorm.length);
   
   const tx = (u: number, v: number, z: number, nu: number, nv: number, nz: number) => {
-    let xGlobal = 0;
-    let yGlobal = 0;
-    let zGlobal = z;
-    
-    let nxGlobal = 0;
-    let nyGlobal = 0;
-    let nzGlobal = nz;
-    
     if (side === 'top') {
-      xGlobal = u - L / 2;
-      yGlobal = lOut / 2 - v;
-      nxGlobal = nu;
-      nyGlobal = -nv;
-    } else if (side === 'bottom') {
-      xGlobal = L / 2 - u;
-      yGlobal = -lOut / 2 + v;
-      nxGlobal = -nu;
-      nyGlobal = nv;
-    } else if (side === 'left') {
-      xGlobal = -wOut / 2 + v;
-      yGlobal = u - L / 2;
-      nxGlobal = nv;
-      nyGlobal = nu;
-    } else { // right
-      xGlobal = wOut / 2 - v;
-      yGlobal = L / 2 - u;
-      nxGlobal = -nv;
-      nyGlobal = -nu;
+      return [u - L / 2, lOut / 2 - v, z, nu, -nv, nz];
     }
-    return [xGlobal, yGlobal, zGlobal, nxGlobal, nyGlobal, nzGlobal];
+    if (side === 'bottom') {
+      return [L / 2 - u, -lOut / 2 + v, z, -nu, nv, nz];
+    }
+    if (side === 'left') {
+      return [-wOut / 2 + v, u - L / 2, z, nv, nu, nz];
+    }
+    return [wOut / 2 - v, L / 2 - u, z, -nv, -nu, nz];
   };
 
   for (let i = 0; i < localPos.length; i += 9) {

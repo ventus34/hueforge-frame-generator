@@ -1,0 +1,1522 @@
+{
+  "cases": [
+    {
+      "name": "rectangle",
+      "triangles": 48,
+      "degenerate": 0,
+      "inconsistentNormals": 0,
+      "unmatchedEdges": 0,
+      "overusedEdges": 0,
+      "bounds": [
+        216.4,
+        216.4,
+        12
+      ],
+      "signedVolume": 108307.197,
+      "finite": true,
+      "hudVolume": 108307.2
+    },
+    {
+      "name": "rounded",
+      "triangles": 176,
+      "degenerate": 0,
+      "inconsistentNormals": 0,
+      "unmatchedEdges": 0,
+      "overusedEdges": 0,
+      "bounds": [
+        216.4,
+        216.4,
+        12
+      ],
+      "signedVolume": 107632.468,
+      "finite": true,
+      "hudVolume": 107632.47
+    },
+    {
+      "name": "hexagon",
+      "triangles": 72,
+      "degenerate": 0,
+      "inconsistentNormals": 0,
+      "unmatchedEdges": 0,
+      "overusedEdges": 0,
+      "bounds": [
+        249.8772,
+        216.4,
+        12
+      ],
+      "signedVolume": 93796.785,
+      "finite": true,
+      "hudVolume": 93796.787
+    },
+    {
+      "name": "hexagon-wide-shelf",
+      "triangles": 72,
+      "degenerate": 0,
+      "inconsistentNormals": 0,
+      "unmatchedEdges": 0,
+      "overusedEdges": 0,
+      "bounds": [
+        249.8772,
+        216.4,
+        12
+      ],
+      "signedVolume": 269335.277,
+      "finite": true,
+      "hudVolume": 269335.286
+    },
+    {
+      "name": "hexagon-after-short-rectangle",
+      "triangles": 72,
+      "degenerate": 0,
+      "inconsistentNormals": 0,
+      "unmatchedEdges": 0,
+      "overusedEdges": 0,
+      "bounds": [
+        249.8772,
+        216.4,
+        12
+      ],
+      "signedVolume": 269335.277,
+      "finite": true,
+      "hudVolume": 269335.286
+    },
+    {
+      "name": "hanger",
+      "triangles": 98,
+      "degenerate": 0,
+      "inconsistentNormals": 0,
+      "unmatchedEdges": 0,
+      "overusedEdges": 0,
+      "bounds": [
+        216.4,
+        216.4,
+        12
+      ],
+      "signedVolume": 108091.197,
+      "finite": true,
+      "hudVolume": 108091.2
+    },
+    {
+      "name": "two-hangers",
+      "triangles": 148,
+      "degenerate": 0,
+      "inconsistentNormals": 0,
+      "unmatchedEdges": 0,
+      "overusedEdges": 0,
+      "bounds": [
+        216.4,
+        216.4,
+        12
+      ],
+      "signedVolume": 107875.197,
+      "finite": true,
+      "hudVolume": 107875.2
+    },
+    {
+      "name": "rect-half-lap-hanger=false",
+      "maxPartLength": 100,
+      "parts": [
+        {
+          "name": "Top - Part 1",
+          "triangles": 68,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            72.9667,
+            12,
+            12
+          ],
+          "signedVolume": 7807.6,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 2",
+          "triangles": 86,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            80.4667,
+            12,
+            12
+          ],
+          "signedVolume": 8641.6,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 3",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            72.9667,
+            12,
+            12
+          ],
+          "signedVolume": 7987.6,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 1",
+          "triangles": 68,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            72.9667,
+            12,
+            12
+          ],
+          "signedVolume": 7807.6,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 2",
+          "triangles": 86,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            80.4667,
+            12,
+            12
+          ],
+          "signedVolume": 8641.6,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 3",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            72.9667,
+            12,
+            12
+          ],
+          "signedVolume": 7987.6,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 1",
+          "triangles": 68,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            72.9667,
+            12
+          ],
+          "signedVolume": 7807.6,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 2",
+          "triangles": 86,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            80.4667,
+            12
+          ],
+          "signedVolume": 8641.6,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 3",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            72.9667,
+            12
+          ],
+          "signedVolume": 7987.6,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 1",
+          "triangles": 68,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            72.9667,
+            12
+          ],
+          "signedVolume": 7807.6,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 2",
+          "triangles": 86,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            80.4667,
+            12
+          ],
+          "signedVolume": 8641.6,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 3",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            72.9667,
+            12
+          ],
+          "signedVolume": 7987.6,
+          "finite": true
+        }
+      ]
+    },
+    {
+      "name": "rect-half-lap-hanger=true",
+      "maxPartLength": 100,
+      "parts": [
+        {
+          "name": "Top - Part 1",
+          "triangles": 68,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            72.9667,
+            12,
+            12
+          ],
+          "signedVolume": 7807.6,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 2",
+          "triangles": 136,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            80.4667,
+            12,
+            12
+          ],
+          "signedVolume": 8425.6,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 3",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            72.9667,
+            12,
+            12
+          ],
+          "signedVolume": 7987.6,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 1",
+          "triangles": 68,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            72.9667,
+            12,
+            12
+          ],
+          "signedVolume": 7807.6,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 2",
+          "triangles": 86,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            80.4667,
+            12,
+            12
+          ],
+          "signedVolume": 8641.6,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 3",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            72.9667,
+            12,
+            12
+          ],
+          "signedVolume": 7987.6,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 1",
+          "triangles": 68,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            72.9667,
+            12
+          ],
+          "signedVolume": 7807.6,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 2",
+          "triangles": 86,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            80.4667,
+            12
+          ],
+          "signedVolume": 8641.6,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 3",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            72.9667,
+            12
+          ],
+          "signedVolume": 7987.6,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 1",
+          "triangles": 68,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            72.9667,
+            12
+          ],
+          "signedVolume": 7807.6,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 2",
+          "triangles": 86,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            80.4667,
+            12
+          ],
+          "signedVolume": 8641.6,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 3",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            72.9667,
+            12
+          ],
+          "signedVolume": 7987.6,
+          "finite": true
+        }
+      ]
+    },
+    {
+      "name": "rect-dovetail-hanger=false",
+      "maxPartLength": 100,
+      "parts": [
+        {
+          "name": "Top - Part 1",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            73.4667,
+            12,
+            12
+          ],
+          "signedVolume": 8425.6,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            73.3167,
+            12,
+            12
+          ],
+          "signedVolume": 8621.8,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 3",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            65.3167,
+            12,
+            12
+          ],
+          "signedVolume": 7349.799,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 1",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            73.4667,
+            12,
+            12
+          ],
+          "signedVolume": 8425.6,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            73.3167,
+            12,
+            12
+          ],
+          "signedVolume": 8621.8,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 3",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            65.3167,
+            12,
+            12
+          ],
+          "signedVolume": 7349.799,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 1",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            73.4667,
+            12
+          ],
+          "signedVolume": 8425.6,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            73.3167,
+            12
+          ],
+          "signedVolume": 8621.8,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 3",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            65.3167,
+            12
+          ],
+          "signedVolume": 7349.799,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 1",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            73.4667,
+            12
+          ],
+          "signedVolume": 8425.6,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            73.3167,
+            12
+          ],
+          "signedVolume": 8621.8,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 3",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            65.3167,
+            12
+          ],
+          "signedVolume": 7349.799,
+          "finite": true
+        }
+      ]
+    },
+    {
+      "name": "rect-dovetail-hanger=true",
+      "maxPartLength": 100,
+      "parts": [
+        {
+          "name": "Top - Part 1",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            73.4667,
+            12,
+            12
+          ],
+          "signedVolume": 8425.6,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 2",
+          "triangles": 102,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            73.3167,
+            12,
+            12
+          ],
+          "signedVolume": 8405.8,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 3",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            65.3167,
+            12,
+            12
+          ],
+          "signedVolume": 7349.799,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 1",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            73.4667,
+            12,
+            12
+          ],
+          "signedVolume": 8425.6,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            73.3167,
+            12,
+            12
+          ],
+          "signedVolume": 8621.8,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 3",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            65.3167,
+            12,
+            12
+          ],
+          "signedVolume": 7349.799,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 1",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            73.4667,
+            12
+          ],
+          "signedVolume": 8425.6,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            73.3167,
+            12
+          ],
+          "signedVolume": 8621.8,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 3",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            65.3167,
+            12
+          ],
+          "signedVolume": 7349.799,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 1",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            73.4667,
+            12
+          ],
+          "signedVolume": 8425.6,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            73.3167,
+            12
+          ],
+          "signedVolume": 8621.8,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 3",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            65.3167,
+            12
+          ],
+          "signedVolume": 7349.799,
+          "finite": true
+        }
+      ]
+    },
+    {
+      "name": "rect-bowtie-hanger=false",
+      "maxPartLength": 100,
+      "parts": [
+        {
+          "name": "Top - Part 1",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            98.2,
+            12,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 2",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            98.2,
+            12,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 1",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            98.2,
+            12,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 2",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            98.2,
+            12,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 1",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            98.2,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 2",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            98.2,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 1",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            98.2,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 2",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            98.2,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        }
+      ]
+    },
+    {
+      "name": "rect-bowtie-hanger=true",
+      "maxPartLength": 100,
+      "parts": [
+        {
+          "name": "Top - Part 1",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            65.4667,
+            12,
+            12
+          ],
+          "signedVolume": 7756.48,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 2",
+          "triangles": 326,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            65.4667,
+            12,
+            12
+          ],
+          "signedVolume": 8284.48,
+          "finite": true
+        },
+        {
+          "name": "Top - Part 3",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            65.4667,
+            12,
+            12
+          ],
+          "signedVolume": 7756.48,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 1",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            98.2,
+            12,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Bottom - Part 2",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            98.2,
+            12,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 1",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            98.2,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Left - Part 2",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            98.2,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 1",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            98.2,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        },
+        {
+          "name": "Right - Part 2",
+          "triangles": 210,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            12,
+            98.2,
+            12
+          ],
+          "signedVolume": 12077.28,
+          "finite": true
+        }
+      ]
+    },
+    {
+      "name": "hex-half-lap-hanger=false",
+      "maxPartLength": 100,
+      "parts": [
+        {
+          "name": "Side 1 - Part 1",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            42.4902,
+            55.5952,
+            12
+          ],
+          "signedVolume": 6964.296,
+          "finite": true
+        },
+        {
+          "name": "Side 1 - Part 2",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            39.0261,
+            61.5952,
+            12
+          ],
+          "signedVolume": 7144.296,
+          "finite": true
+        },
+        {
+          "name": "Side 2 - Part 1",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            64.1958,
+            12,
+            12
+          ],
+          "signedVolume": 6964.297,
+          "finite": true
+        },
+        {
+          "name": "Side 2 - Part 2",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            64.1958,
+            12,
+            12
+          ],
+          "signedVolume": 7144.297,
+          "finite": true
+        },
+        {
+          "name": "Side 3 - Part 1",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            39.0261,
+            61.5952,
+            12
+          ],
+          "signedVolume": 6964.295,
+          "finite": true
+        },
+        {
+          "name": "Side 3 - Part 2",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            42.4902,
+            55.5952,
+            12
+          ],
+          "signedVolume": 7144.296,
+          "finite": true
+        },
+        {
+          "name": "Side 4 - Part 1",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            42.4902,
+            55.5952,
+            12
+          ],
+          "signedVolume": 6964.296,
+          "finite": true
+        },
+        {
+          "name": "Side 4 - Part 2",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            39.0261,
+            61.5952,
+            12
+          ],
+          "signedVolume": 7144.296,
+          "finite": true
+        },
+        {
+          "name": "Side 5 - Part 1",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            64.1958,
+            12,
+            12
+          ],
+          "signedVolume": 6964.297,
+          "finite": true
+        },
+        {
+          "name": "Side 5 - Part 2",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            64.1958,
+            12,
+            12
+          ],
+          "signedVolume": 7144.297,
+          "finite": true
+        },
+        {
+          "name": "Side 6 - Part 1",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            39.0261,
+            61.5952,
+            12
+          ],
+          "signedVolume": 6964.295,
+          "finite": true
+        },
+        {
+          "name": "Side 6 - Part 2",
+          "triangles": 70,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            42.4902,
+            55.5952,
+            12
+          ],
+          "signedVolume": 7144.296,
+          "finite": true
+        }
+      ]
+    },
+    {
+      "name": "hex-dovetail-hanger=false",
+      "maxPartLength": 100,
+      "parts": [
+        {
+          "name": "Side 1 - Part 1",
+          "triangles": 54,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            39.2761,
+            52.0282,
+            12
+          ],
+          "signedVolume": 7582.296,
+          "finite": true
+        },
+        {
+          "name": "Side 1 - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            35.2011,
+            54.9701,
+            12
+          ],
+          "signedVolume": 6506.496,
+          "finite": true
+        },
+        {
+          "name": "Side 2 - Part 1",
+          "triangles": 54,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            64.6958,
+            12,
+            12
+          ],
+          "signedVolume": 7582.297,
+          "finite": true
+        },
+        {
+          "name": "Side 2 - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            56.5458,
+            12,
+            12
+          ],
+          "signedVolume": 6506.497,
+          "finite": true
+        },
+        {
+          "name": "Side 3 - Part 1",
+          "triangles": 54,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            35.2761,
+            60.0282,
+            12
+          ],
+          "signedVolume": 7582.296,
+          "finite": true
+        },
+        {
+          "name": "Side 3 - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            38.6652,
+            48.9701,
+            12
+          ],
+          "signedVolume": 6506.498,
+          "finite": true
+        },
+        {
+          "name": "Side 4 - Part 1",
+          "triangles": 54,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            39.2761,
+            52.0282,
+            12
+          ],
+          "signedVolume": 7582.296,
+          "finite": true
+        },
+        {
+          "name": "Side 4 - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            35.2011,
+            54.9701,
+            12
+          ],
+          "signedVolume": 6506.496,
+          "finite": true
+        },
+        {
+          "name": "Side 5 - Part 1",
+          "triangles": 54,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            64.6958,
+            12,
+            12
+          ],
+          "signedVolume": 7582.297,
+          "finite": true
+        },
+        {
+          "name": "Side 5 - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            56.5458,
+            12,
+            12
+          ],
+          "signedVolume": 6506.497,
+          "finite": true
+        },
+        {
+          "name": "Side 6 - Part 1",
+          "triangles": 54,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            35.2761,
+            60.0282,
+            12
+          ],
+          "signedVolume": 7582.296,
+          "finite": true
+        },
+        {
+          "name": "Side 6 - Part 2",
+          "triangles": 52,
+          "degenerate": 0,
+          "inconsistentNormals": 0,
+          "unmatchedEdges": 0,
+          "overusedEdges": 0,
+          "bounds": [
+            38.6652,
+            48.9701,
+            12
+          ],
+          "signedVolume": 6506.498,
+          "finite": true
+        }
+      ]
+    }
+  ],
+  "lapOccupancy": [
+    {
+      "point": [
+        0.37,
+        94.03,
+        3
+      ],
+      "containingParts": [
+        "Top - Part 2"
+      ]
+    },
+    {
+      "point": [
+        0.37,
+        94.03,
+        9
+      ],
+      "containingParts": [
+        "Top - Part 2"
+      ]
+    }
+  ],
+  "malformedSTLInput": "STL positions must contain one or more complete triangles."
+}

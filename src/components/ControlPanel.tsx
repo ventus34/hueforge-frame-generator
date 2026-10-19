@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import type { FrameParams } from '../utils/geometry';
+import React, { useEffect, useRef, useState } from 'react';
+import type { FrameParams, SplitPart } from '../utils/geometry';
 import { generateSplitFrameParts, generateBowtieKeyGeometry } from '../utils/geometry';
 import { downloadSTL } from '../utils/stlExporter';
 import { TRANSLATIONS } from '../utils/translations';
 import type { Lang } from '../utils/translations';
+import { getEffectiveFrameDimensions, normalizeFrameParams, validateFrameParams } from '../utils/params';
+import { NumberInput } from './NumberInput';
 
 interface ControlPanelProps {
   params: FrameParams;
@@ -13,6 +15,8 @@ interface ControlPanelProps {
   setShowGrid: (show: boolean) => void;
   lang: Lang;
   setLang: (lang: Lang) => void;
+  cachedParts?: SplitPart[];
+  exportDisabled?: boolean;
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -22,10 +26,49 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   showGrid,
   setShowGrid,
   lang,
-  setLang
+  setLang,
+  cachedParts,
+  exportDisabled = false
 }) => {
   const t = TRANSLATIONS[lang];
   const [showSchematic, setShowSchematic] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!showSchematic) return;
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus();
+    const handleDialogKeys = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowSchematic(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+      ));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleDialogKeys);
+    return () => {
+      document.removeEventListener('keydown', handleDialogKeys);
+      previousFocus?.focus();
+    };
+  }, [showSchematic]);
 
   const PRESETS = [
     { name: `${t.presetSquare} 200x200`, w: 200, l: 200, shape: 'rect' as const },
@@ -52,39 +95,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     }
 
     if (key === 'height') {
-      const hVal = value as number;
-      if (newParams.dPocket >= hVal) {
-        newParams.dPocket = Math.max(1, hVal - 2); // Leave 2mm shelf
-      }
-    }
-    if (key === 'dPocket') {
-      const dpVal = value as number;
-      if (dpVal >= newParams.height) {
-        newParams.dPocket = Math.max(1, newParams.height - 2);
-      }
+      newParams.dPocket = Math.min(newParams.dPocket, newParams.height - 2);
     }
 
-    const wPocket = newParams.wPic + 2 * newParams.clearance;
-    const lPocket = newParams.shape === 'hex' ? wPocket : (newParams.lPic + 2 * newParams.clearance);
-    const maxShelf = Math.min(wPocket, lPocket) / 2 - 2;
-    if (newParams.sShelf > maxShelf) {
-      newParams.sShelf = Math.max(1, Math.floor(maxShelf));
+    if (key === 'splitEnabled' && value === true) {
+      newParams.cornerRadius = 0;
     }
 
-    if (newParams.shape === 'rect') {
-      const wOut = wPocket + 2 * newParams.tBorder;
-      const lOut = lPocket + 2 * newParams.tBorder;
-      const maxRadius = Math.min(newParams.tBorder, wOut / 2, lOut / 2);
-      if (newParams.cornerRadius > maxRadius) {
-        newParams.cornerRadius = Math.floor(maxRadius);
-      }
-    }
-
-    onChange(newParams);
+    onChange(normalizeFrameParams(newParams));
   };
 
   const applyPreset = (w: number, l: number, shape: 'rect' | 'hex') => {
-    const newParams = {
+    const newParams: FrameParams = {
       ...params,
       shape,
       wPic: w,
@@ -99,24 +121,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       }
     }
 
-    const wPocket = w + 2 * params.clearance;
-    const lPocket = shape === 'hex' ? wPocket : (l + 2 * params.clearance);
-    const maxShelf = Math.min(wPocket, lPocket) / 2 - 2;
-    if (newParams.sShelf > maxShelf) {
-      newParams.sShelf = Math.max(1, Math.floor(maxShelf));
-    }
-
-    onChange(newParams);
+    onChange(normalizeFrameParams(newParams));
   };
 
-  const wPocket = params.wPic + 2 * params.clearance;
-  const lPocket = params.shape === 'hex' ? wPocket : (params.lPic + 2 * params.clearance);
-  const maxShelfWidth = Math.min(wPocket, lPocket) / 2 - 2;
-
-  // Outer bounds
-  const wOut = wPocket + 2 * params.tBorder;
-  const lOut = lPocket + 2 * params.tBorder;
-  const maxRadiusLimit = params.shape === 'rect' ? Math.min(params.tBorder, wOut / 2, lOut / 2) : 0;
+  const dimensions = getEffectiveFrameDimensions(params);
+  const maxShelfWidth = Math.max(1, Math.floor(Math.min(dimensions.pocketWidth, dimensions.pocketLength) / 2 - 2));
+  const maxRadiusLimit = params.shape === 'rect' ? Math.min(params.tBorder, dimensions.outerWidth / 2, dimensions.outerLength / 2) : 0;
+  const validationErrors = validateFrameParams(params);
+  const exportBlocked = exportDisabled || validationErrors.length > 0;
+  const splitParts = cachedParts ?? (validationErrors.length === 0 && params.splitEnabled ? generateSplitFrameParts(params) : []);
 
   return (
     <div className="sidebar glass-panel">
@@ -172,7 +185,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               return (
                 <button
                   key={preset.name}
+                  type="button"
                   className={`preset-btn ${isActive ? 'active' : ''}`}
+                  aria-pressed={isActive}
                   onClick={() => applyPreset(preset.w, preset.l, preset.shape)}
                 >
                   {preset.name}
@@ -187,13 +202,17 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <h2 className="section-title">{t.shapeTitle}</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
             <button
+              type="button"
               className={`preset-btn ${params.shape === 'rect' ? 'active' : ''}`}
+              aria-pressed={params.shape === 'rect'}
               onClick={() => updateParam('shape', 'rect')}
             >
               {t.shapeRect}
             </button>
             <button
+              type="button"
               className={`preset-btn ${params.shape === 'hex' ? 'active' : ''}`}
+              aria-pressed={params.shape === 'hex'}
               onClick={() => updateParam('shape', 'hex')}
             >
               {t.shapeHex}
@@ -208,9 +227,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           {/* Picture Width */}
           <div className="form-field">
             <div className="field-header">
-              <span className="field-label">
+              <label className="field-label" htmlFor="picture-width-number">
                 {params.shape === 'hex' ? t.picHexWidth : t.picWidth}
-              </span>
+              </label>
               <span className="field-value">{params.wPic} mm</span>
             </div>
             <div className="slider-container">
@@ -219,15 +238,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 min="50"
                 max="1000"
                 value={params.wPic}
+                aria-label={params.shape === 'hex' ? t.picHexWidth : t.picWidth}
                 onChange={(e) => updateParam('wPic', parseInt(e.target.value))}
               />
-              <input
-                type="number"
-                className="numeric-input"
-                min="50"
-                max="1000"
+              <NumberInput
+                key={params.wPic}
+                id="picture-width-number"
+                label={params.shape === 'hex' ? t.picHexWidth : t.picWidth}
                 value={params.wPic}
-                onChange={(e) => updateParam('wPic', parseInt(e.target.value) || 50)}
+                min={50}
+                max={1000}
+                lang={lang}
+                onCommit={(value) => updateParam('wPic', value)}
               />
             </div>
           </div>
@@ -236,7 +258,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           {params.shape === 'rect' && (
             <div className="form-field" style={{ marginTop: '1rem' }}>
               <div className="field-header">
-                <span className="field-label">{t.picLength}</span>
+                <label className="field-label" htmlFor="picture-length-number">{t.picLength}</label>
                 <span className="field-value">{params.lPic} mm</span>
               </div>
               <div className="slider-container">
@@ -245,15 +267,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   min="50"
                   max="1000"
                   value={params.lPic}
+                  aria-label={t.picLength}
                   onChange={(e) => updateParam('lPic', parseInt(e.target.value))}
                 />
-                <input
-                  type="number"
-                  className="numeric-input"
-                  min="50"
-                  max="1000"
+                <NumberInput
+                  key={params.lPic}
+                  id="picture-length-number"
+                  label={t.picLength}
                   value={params.lPic}
-                  onChange={(e) => updateParam('lPic', parseInt(e.target.value) || 50)}
+                  min={50}
+                  max={1000}
+                  lang={lang}
+                  onCommit={(value) => updateParam('lPic', value)}
                 />
               </div>
             </div>
@@ -262,7 +287,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           {/* Clearance Tolerance */}
           <div className="form-field" style={{ marginTop: '1rem' }}>
             <div className="field-header">
-              <span className="field-label">{t.clearance}</span>
+              <label className="field-label" htmlFor="clearance-number">{t.clearance}</label>
               <span className="field-value">{params.clearance} mm</span>
             </div>
             <div className="slider-container">
@@ -272,16 +297,19 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 max="2"
                 step="0.1"
                 value={params.clearance}
+                aria-label={t.clearance}
                 onChange={(e) => updateParam('clearance', parseFloat(e.target.value))}
               />
-              <input
-                type="number"
-                className="numeric-input"
-                min="0"
-                max="2"
-                step="0.1"
+              <NumberInput
+                key={params.clearance}
+                id="clearance-number"
+                label={t.clearance}
                 value={params.clearance}
-                onChange={(e) => updateParam('clearance', parseFloat(e.target.value) || 0)}
+                min={0}
+                max={2}
+                step={0.1}
+                lang={lang}
+                onCommit={(value) => updateParam('clearance', value)}
               />
             </div>
           </div>
@@ -294,7 +322,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           {/* Border Thickness */}
           <div className="form-field">
             <div className="field-header">
-              <span className="field-label">{t.borderThickness}</span>
+              <label className="field-label" htmlFor="border-thickness-number">{t.borderThickness}</label>
               <span className="field-value">{params.tBorder} mm</span>
             </div>
             <div className="slider-container">
@@ -303,15 +331,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 min="3"
                 max="30"
                 value={params.tBorder}
+                aria-label={t.borderThickness}
                 onChange={(e) => updateParam('tBorder', parseInt(e.target.value))}
               />
-              <input
-                type="number"
-                className="numeric-input"
-                min="3"
-                max="30"
+              <NumberInput
+                key={params.tBorder}
+                id="border-thickness-number"
+                label={t.borderThickness}
                 value={params.tBorder}
-                onChange={(e) => updateParam('tBorder', parseInt(e.target.value) || 3)}
+                min={3}
+                max={30}
+                lang={lang}
+                onCommit={(value) => updateParam('tBorder', value)}
               />
             </div>
           </div>
@@ -320,7 +351,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           {params.shape === 'rect' && (
             <div className="form-field" style={{ marginTop: '1rem' }}>
               <div className="field-header">
-                <span className="field-label">{t.cornerRadius}</span>
+                <label className="field-label" htmlFor="corner-radius-number">{t.cornerRadius}</label>
                 <span className="field-value">{params.cornerRadius} mm</span>
               </div>
               <div className="slider-container">
@@ -329,24 +360,36 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   min="0"
                   max={Math.max(0, Math.floor(maxRadiusLimit))}
                   value={params.cornerRadius}
+                  aria-label={t.cornerRadius}
+                  disabled={params.splitEnabled}
                   onChange={(e) => updateParam('cornerRadius', parseInt(e.target.value))}
                 />
-                <input
-                  type="number"
-                  className="numeric-input"
-                  min="0"
-                  max={Math.max(0, Math.floor(maxRadiusLimit))}
+                <NumberInput
+                  key={params.cornerRadius}
+                  id="corner-radius-number"
+                  label={t.cornerRadius}
                   value={params.cornerRadius}
-                  onChange={(e) => updateParam('cornerRadius', parseInt(e.target.value) || 0)}
+                  min={0}
+                  max={Math.max(0, Math.floor(maxRadiusLimit))}
+                  lang={lang}
+                  disabled={params.splitEnabled}
+                  onCommit={(value) => updateParam('cornerRadius', value)}
                 />
               </div>
+              {params.splitEnabled && (
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', lineHeight: '1.3' }}>
+                  {lang === 'pl'
+                    ? 'Zaokrąglenia są wyłączone przy dzieleniu ramki; promień ustawiono na 0 mm.'
+                    : 'Corner rounding is disabled while the frame is split; the radius is set to 0 mm.'}
+                </p>
+              )}
             </div>
           )}
 
           {/* Total Height */}
           <div className="form-field" style={{ marginTop: '1rem' }}>
             <div className="field-header">
-              <span className="field-label">{t.height}</span>
+              <label className="field-label" htmlFor="height-number">{t.height}</label>
               <span className="field-value">{params.height} mm</span>
             </div>
             <div className="slider-container">
@@ -355,15 +398,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 min="4"
                 max="40"
                 value={params.height}
+                aria-label={t.height}
                 onChange={(e) => updateParam('height', parseInt(e.target.value))}
               />
-              <input
-                type="number"
-                className="numeric-input"
-                min="4"
-                max="40"
+              <NumberInput
+                key={params.height}
+                id="height-number"
+                label={t.height}
                 value={params.height}
-                onChange={(e) => updateParam('height', parseInt(e.target.value) || 4)}
+                min={4}
+                max={40}
+                lang={lang}
+                onCommit={(value) => updateParam('height', value)}
               />
             </div>
           </div>
@@ -371,7 +417,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           {/* Pocket Depth */}
           <div className="form-field" style={{ marginTop: '1rem' }}>
             <div className="field-header">
-              <span className="field-label">{t.pocketDepth}</span>
+              <label className="field-label" htmlFor="pocket-depth-number">{t.pocketDepth}</label>
               <span className="field-value">{params.dPocket} mm</span>
             </div>
             <div className="slider-container">
@@ -380,15 +426,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 min="1"
                 max={params.height - 2}
                 value={params.dPocket}
+                aria-label={t.pocketDepth}
                 onChange={(e) => updateParam('dPocket', parseInt(e.target.value))}
               />
-              <input
-                type="number"
-                className="numeric-input"
-                min="1"
-                max={params.height - 2}
+              <NumberInput
+                key={`${params.height}:${params.dPocket}`}
+                id="pocket-depth-number"
+                label={t.pocketDepth}
                 value={params.dPocket}
-                onChange={(e) => updateParam('dPocket', parseInt(e.target.value) || 1)}
+                min={1}
+                max={params.height - 2}
+                lang={lang}
+                onCommit={(value) => updateParam('dPocket', value)}
               />
             </div>
           </div>
@@ -396,7 +445,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           {/* Support Shelf Width */}
           <div className="form-field" style={{ marginTop: '1rem' }}>
             <div className="field-header">
-              <span className="field-label">{t.shelfWidth}</span>
+              <label className="field-label" htmlFor="shelf-width-number">{t.shelfWidth}</label>
               <span className="field-value">{params.sShelf} mm</span>
             </div>
             <div className="slider-container">
@@ -405,15 +454,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 min="1"
                 max={Math.max(1, Math.floor(maxShelfWidth))}
                 value={params.sShelf}
+                aria-label={t.shelfWidth}
                 onChange={(e) => updateParam('sShelf', parseInt(e.target.value))}
               />
-              <input
-                type="number"
-                className="numeric-input"
-                min="1"
-                max={Math.max(1, Math.floor(maxShelfWidth))}
+              <NumberInput
+                key={`${params.wPic}:${params.lPic}:${params.clearance}:${params.sShelf}`}
+                id="shelf-width-number"
+                label={t.shelfWidth}
                 value={params.sShelf}
-                onChange={(e) => updateParam('sShelf', parseInt(e.target.value) || 1)}
+                min={1}
+                max={Math.max(1, Math.floor(maxShelfWidth))}
+                lang={lang}
+                onCommit={(value) => updateParam('sShelf', value)}
               />
             </div>
           </div>
@@ -441,11 +493,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Hanger Side Select */}
                 <div className="form-field">
                   <div className="field-header">
-                    <span className="field-label">{t.hangerSide}</span>
+                    <label className="field-label" htmlFor="hanger-side-select">{t.hangerSide}</label>
                   </div>
                   <select
+                    id="hanger-side-select"
                     value={params.hangerSide}
-                    onChange={(e) => updateParam('hangerSide', e.target.value as any)}
+                    onChange={(e) => updateParam('hangerSide', e.target.value as FrameParams['hangerSide'])}
                     style={{
                       width: '100%',
                       padding: '0.4rem',
@@ -469,10 +522,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="field-header">
                     <span className="field-label">{t.hangerCount}</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <div role="group" aria-label={t.hangerCount} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                     <button
                       type="button"
                       className={`preset-btn ${params.hangerCount === 1 ? 'active' : ''}`}
+                      aria-pressed={params.hangerCount === 1}
                       onClick={() => updateParam('hangerCount', 1)}
                     >
                       1
@@ -480,6 +534,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <button
                       type="button"
                       className={`preset-btn ${params.hangerCount === 2 ? 'active' : ''}`}
+                      aria-pressed={params.hangerCount === 2}
                       onClick={() => updateParam('hangerCount', 2)}
                     >
                       2
@@ -490,7 +545,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Hole Diameter Slider */}
                 <div className="form-field">
                   <div className="field-header">
-                    <span className="field-label">{t.hangerDiameter}</span>
+              <label className="field-label" htmlFor="hanger-diameter-number">{t.hangerDiameter}</label>
                     <span className="field-value">{params.hangerDiameter} mm</span>
                   </div>
                   <div className="slider-container">
@@ -499,15 +554,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       min="3"
                       max="15"
                       value={params.hangerDiameter}
+                      aria-label={t.hangerDiameter}
                       onChange={(e) => updateParam('hangerDiameter', parseInt(e.target.value))}
                     />
-                    <input
-                      type="number"
-                      className="numeric-input"
-                      min="3"
-                      max="15"
+                    <NumberInput
+                      key={params.hangerDiameter}
+                      id="hanger-diameter-number"
+                      label={t.hangerDiameter}
                       value={params.hangerDiameter}
-                      onChange={(e) => updateParam('hangerDiameter', parseInt(e.target.value) || 3)}
+                      min={3}
+                      max={15}
+                      lang={lang}
+                      onCommit={(value) => updateParam('hangerDiameter', value)}
                     />
                   </div>
                 </div>
@@ -552,7 +610,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               {/* Max Part Length */}
               <div className="form-field">
                 <div className="field-header">
-                  <span className="field-label">{t.maxPartLength}</span>
+                  <label className="field-label" htmlFor="max-part-length-number">{t.maxPartLength}</label>
                   <span className="field-value">{params.maxPartLength} mm</span>
                 </div>
                 <div className="slider-container">
@@ -561,15 +619,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     min="100"
                     max="400"
                     value={params.maxPartLength}
+                    aria-label={t.maxPartLength}
                     onChange={(e) => updateParam('maxPartLength', parseInt(e.target.value))}
                   />
-                  <input
-                    type="number"
-                    className="numeric-input"
-                    min="100"
-                    max="400"
+                  <NumberInput
+                    key={params.maxPartLength}
+                    id="max-part-length-number"
+                    label={t.maxPartLength}
                     value={params.maxPartLength}
-                    onChange={(e) => updateParam('maxPartLength', parseInt(e.target.value) || 100)}
+                    min={100}
+                    max={400}
+                    lang={lang}
+                    onCommit={(value) => updateParam('maxPartLength', value)}
                   />
                 </div>
               </div>
@@ -577,11 +638,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               {/* Joint Type Select */}
               <div className="form-field">
                 <div className="field-header">
-                  <span className="field-label">{t.jointType}</span>
+                  <label className="field-label" htmlFor="joint-type-select">{t.jointType}</label>
                 </div>
                 <select
+                  id="joint-type-select"
                   value={params.jointType}
-                  onChange={(e) => updateParam('jointType', e.target.value as any)}
+                  onChange={(e) => updateParam('jointType', e.target.value as FrameParams['jointType'])}
                   style={{
                     width: '100%',
                     padding: '0.4rem',
@@ -608,10 +670,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   {t.downloadPartsTitle}
                 </span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-                  {generateSplitFrameParts(params).map((part) => (
+                  {splitParts.map((part) => (
                     <button
                       key={part.name}
+                      type="button"
                       className="preset-btn"
+                      disabled={exportBlocked}
                       style={{ width: '100%', padding: '0.4rem', fontSize: '0.8rem', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}
                       onClick={() => {
                         const prefix = lang === 'en' ? 'part' : 'czesc';
@@ -625,7 +689,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   ))}
                   {params.jointType === 'bowtie' && (
                     <button
+                      type="button"
                       className="preset-btn"
+                      disabled={exportBlocked}
                       style={{ width: '100%', padding: '0.4rem', fontSize: '0.8rem', justifyContent: 'space-between', display: 'flex', alignItems: 'center', borderColor: 'var(--color-primary)', color: 'var(--color-primary-hover)' }}
                       onClick={() => {
                         const keyGeom = generateBowtieKeyGeometry(params);
@@ -657,13 +723,33 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           </label>
         </div>
 
-        <button className="download-btn" onClick={onDownload}>
-          {t.downloadStl}
+        {validationErrors.length > 0 && (
+          <div role="alert" style={{ marginTop: '0.75rem', color: 'var(--color-primary-hover)', fontSize: '0.8rem', lineHeight: '1.4' }}>
+            <p>{lang === 'pl' ? 'Popraw parametry przed eksportem:' : 'Correct these parameters before exporting:'}</p>
+            <ul style={{ marginTop: '0.25rem', paddingLeft: '1.25rem' }}>
+              {validationErrors.map((error) => (
+                <li key={error}>
+                  {lang === 'pl' && error.startsWith('The selected hanger side has no safe split seam')
+                    ? 'Po tej stronie ramy nie ma bezpiecznego miejsca podziału między narożnymi złączami motylkowymi. Zwiększ jej wymiar, zmniejsz średnicę lub liczbę otworów albo wybierz inne złącze.'
+                    : error}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <button className="download-btn" onClick={onDownload} disabled={exportBlocked}>
+          {params.splitEnabled
+            ? (lang === 'pl' ? 'Pobierz wszystkie części (ZIP)' : 'Download all parts (ZIP)')
+            : t.downloadStl}
         </button>
 
         <button 
+          type="button"
           className="preset-btn" 
           style={{ width: '100%', marginTop: '0.25rem' }} 
+          aria-haspopup="dialog"
+          aria-controls="schematic-dialog"
           onClick={() => setShowSchematic(true)}
         >
           {t.showSchematic}
@@ -672,14 +758,23 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
       {/* Schematic Modal Dialog */}
       {showSchematic && (
-        <div className="overlay-dialog glass-panel">
-          <button className="overlay-close" onClick={() => setShowSchematic(false)}>✕</button>
-          <h2 style={{ fontSize: '1.25rem', marginBottom: '0.75rem', fontWeight: 600 }}>{t.modalTitle}</h2>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+        <div
+          ref={dialogRef}
+          id="schematic-dialog"
+          className="overlay-dialog glass-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="schematic-dialog-title"
+          aria-describedby="schematic-dialog-description"
+          tabIndex={-1}
+        >
+          <button ref={closeButtonRef} type="button" className="overlay-close" aria-label={lang === 'pl' ? 'Zamknij schemat' : 'Close schematic'} onClick={() => setShowSchematic(false)}>✕</button>
+          <h2 id="schematic-dialog-title" style={{ fontSize: '1.25rem', marginBottom: '0.75rem', fontWeight: 600 }}>{t.modalTitle}</h2>
+          <p id="schematic-dialog-description" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
             {t.modalDesc}
           </p>
           
-          <svg viewBox="0 0 400 200" className="schematic-svg">
+          <svg viewBox="0 0 400 200" className="schematic-svg" aria-hidden="true">
             {/* Background Grid lines */}
             <line x1="20" y1="180" x2="380" y2="180" stroke="#333" strokeWidth="2" />
             <text x="350" y="195" fill="#666" fontSize="10" fontFamily="monospace">{t.modalGridLabel}</text>

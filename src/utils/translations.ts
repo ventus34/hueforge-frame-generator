@@ -42,7 +42,7 @@ export const TRANSLATIONS = {
     
     // Wall mounting
     wallMountingTitle: 'Montaż ścienny',
-    keyholeToggle: 'Otwory na gwoździe / haczyki',
+    keyholeToggle: 'Ślepe otwory montażowe',
     hangerSide: 'Bok z otworami',
     hangerSideTop: 'Góra',
     hangerSideBottom: 'Dół',
@@ -54,7 +54,7 @@ export const TRANSLATIONS = {
     
     // Visual settings
     visual3dTitle: 'Wizualizacja 3D',
-    gridToggle: 'Siatka stółu (256x256)',
+    gridToggle: 'Siatka wybranego stołu',
     colorLabel: 'Kolor filamentu:',
     customColorTitle: 'Własny kolor HEX',
     
@@ -66,7 +66,7 @@ export const TRANSLATIONS = {
     hudOuterSize: 'Rozmiar zewnętrzny',
     hudHeight: 'Wysokość ramki',
     hudVolume: 'Objętość modelu',
-    hudWeight: 'Szacowana waga (PLA)',
+    hudWeight: 'Masa pełnego modelu (PLA)',
     hudHexBokBok: 'bok-bok',
     
     // Schematic modal
@@ -97,7 +97,7 @@ export const TRANSLATIONS = {
     plannerDelete: '🗑️ Usuń pasek',
     plannerClearAll: '❌ Usuń wszystkie',
     plannerSizeLabel: 'Rozmiar:',
-    plannerDragTip: '🖱️ Przeciągaj paski lewym przyciskiem myszy. Przeciągaj tło, aby przesuwać widok.',
+    plannerDragTip: 'Przeciągaj paski lub tło myszą albo dotykiem. Wybrany pasek: strzałki przesuwają, R obraca, Delete usuwa; Shift zwiększa krok.',
     plannerWheelTip: '🔍 Użyj kółka myszy lub suwaka w panelu, aby przybliżać/oddalać.',
     plannerInvalidTip: '⚠️ Kolor czerwony oznacza nieprawidłowe ułożenie',
     plannerResetView: '🔄 Resetuj widok',
@@ -172,7 +172,7 @@ export const TRANSLATIONS = {
     
     // Wall mounting
     wallMountingTitle: 'Wall Mounting',
-    keyholeToggle: 'Nail / hook holes',
+    keyholeToggle: 'Blind mounting recesses',
     hangerSide: 'Hanger side',
     hangerSideTop: 'Top',
     hangerSideBottom: 'Bottom',
@@ -184,7 +184,7 @@ export const TRANSLATIONS = {
     
     // Visual settings
     visual3dTitle: '3D Viewport',
-    gridToggle: 'Show grid (256x256)',
+    gridToggle: 'Show selected print bed grid',
     colorLabel: 'Filament color:',
     customColorTitle: 'Custom HEX color',
     
@@ -196,7 +196,7 @@ export const TRANSLATIONS = {
     hudOuterSize: 'Outer dimensions',
     hudHeight: 'Frame height',
     hudVolume: 'Model volume',
-    hudWeight: 'Estimated weight (PLA)',
+    hudWeight: 'Solid model mass (PLA)',
     hudHexBokBok: 'flat-flat',
     
     // Schematic modal
@@ -227,7 +227,7 @@ export const TRANSLATIONS = {
     plannerDelete: '🗑️ Delete strip',
     plannerClearAll: '❌ Clear all',
     plannerSizeLabel: 'Size:',
-    plannerDragTip: '🖱️ Left-click and drag strips. Drag the background to pan the view.',
+    plannerDragTip: 'Drag strips or the background with mouse or touch. Selected strip: arrows move, R rotates, Delete removes; Shift increases the step.',
     plannerWheelTip: '🔍 Use the mouse wheel or the sidebar slider to zoom in/out.',
     plannerInvalidTip: '⚠️ Red indicates invalid strip placement',
     plannerResetView: '🔄 Reset View',
