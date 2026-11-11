@@ -12,6 +12,18 @@ test('defaults are safe and valid', () => {
   assert.deepEqual(normalizeFrameParams(null), DEFAULT_PARAMS);
 });
 
+test('picture dimensions retain tenths of a millimeter through normalization and validation', () => {
+  const params = normalizeFrameParams({ ...DEFAULT_PARAMS, wPic: 150.3, lPic: 200.7 });
+  assert.equal(params.wPic, 150.3);
+  assert.equal(params.lPic, 200.7);
+  assert.deepEqual(validateFrameParams(params), []);
+  const dimensions = getEffectiveFrameDimensions(params);
+  assert.ok(Math.abs(dimensions.pocketWidth - 150.7) < 1e-8);
+  assert.ok(Math.abs(dimensions.pocketLength - 201.1) < 1e-8);
+  assert.ok(validateFrameParams({ ...params, wPic: 150.35 }).some(error => error.includes('wPic must use 0.1')));
+  assert.ok(validateFrameParams({ ...params, lPic: 200.75 }).some(error => error.includes('lPic must use 0.1')));
+});
+
 test('normalization replaces non-finite input and clamps configured ranges', () => {
   const normalized = normalizeFrameParams({
     ...DEFAULT_PARAMS,

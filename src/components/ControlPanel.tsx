@@ -237,9 +237,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 type="range"
                 min="50"
                 max="1000"
+                step="0.1"
                 value={params.wPic}
                 aria-label={params.shape === 'hex' ? t.picHexWidth : t.picWidth}
-                onChange={(e) => updateParam('wPic', parseInt(e.target.value))}
+                onChange={(e) => updateParam('wPic', parseFloat(e.target.value))}
               />
               <NumberInput
                 key={params.wPic}
@@ -248,6 +249,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 value={params.wPic}
                 min={50}
                 max={1000}
+                step={0.1}
                 lang={lang}
                 onCommit={(value) => updateParam('wPic', value)}
               />
@@ -266,9 +268,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   type="range"
                   min="50"
                   max="1000"
+                  step="0.1"
                   value={params.lPic}
                   aria-label={t.picLength}
-                  onChange={(e) => updateParam('lPic', parseInt(e.target.value))}
+                  onChange={(e) => updateParam('lPic', parseFloat(e.target.value))}
                 />
                 <NumberInput
                   key={params.lPic}
@@ -277,6 +280,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   value={params.lPic}
                   min={50}
                   max={1000}
+                  step={0.1}
                   lang={lang}
                   onCommit={(value) => updateParam('lPic', value)}
                 />

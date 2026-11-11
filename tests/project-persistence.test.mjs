@@ -26,6 +26,8 @@ const baseProject = () => ({
 
 test('project JSON preserves frame, strips, display, language, color and custom printer settings', () => {
   const project = baseProject();
+  project.params.wPic = 150.3;
+  project.params.lPic = 200.7;
   assert.deepEqual(parseProject(project), project);
   assert.deepEqual(parseProjectText(JSON.stringify(project)), project);
 });

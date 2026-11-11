@@ -108,8 +108,8 @@ function normalizeDecimal(
 export function normalizeFrameParams(input: unknown): FrameParams {
   const source = isRecord(input) ? input : {};
   const shape = source.shape === 'hex' ? 'hex' : 'rect';
-  const wPic = normalizeInteger(source, 'wPic', DEFAULT_PARAMS.wPic, ...NUMERIC_LIMITS.wPic);
-  const lPic = normalizeInteger(source, 'lPic', DEFAULT_PARAMS.lPic, ...NUMERIC_LIMITS.lPic);
+  const wPic = normalizeDecimal(source, 'wPic', DEFAULT_PARAMS.wPic, ...NUMERIC_LIMITS.wPic);
+  const lPic = normalizeDecimal(source, 'lPic', DEFAULT_PARAMS.lPic, ...NUMERIC_LIMITS.lPic);
   const clearance = normalizeDecimal(source, 'clearance', DEFAULT_PARAMS.clearance, ...NUMERIC_LIMITS.clearance);
   const tBorder = normalizeInteger(source, 'tBorder', DEFAULT_PARAMS.tBorder, ...NUMERIC_LIMITS.tBorder);
   const height = normalizeInteger(source, 'height', DEFAULT_PARAMS.height, ...NUMERIC_LIMITS.height);
@@ -180,11 +180,14 @@ export function validateFrameParams(params: unknown): string[] {
   }
 
   const paramsTyped = values as unknown as FrameParams;
-  if (typeof values.clearance === 'number' && Number.isFinite(values.clearance)
-    && Math.abs(values.clearance * 10 - Math.round(values.clearance * 10)) > 1e-8) {
-    errors.push('clearance must use 0.1 mm increments.');
+  for (const key of ['wPic', 'lPic', 'clearance'] as const) {
+    const value = values[key];
+    if (typeof value === 'number' && Number.isFinite(value)
+      && Math.abs(value * 10 - Math.round(value * 10)) > 1e-8) {
+      errors.push(`${key} must use 0.1 mm increments.`);
+    }
   }
-  for (const key of ['wPic', 'lPic', 'tBorder', 'height', 'dPocket', 'sShelf', 'cornerRadius', 'hangerDiameter', 'maxPartLength'] as const) {
+  for (const key of ['tBorder', 'height', 'dPocket', 'sShelf', 'cornerRadius', 'hangerDiameter', 'maxPartLength'] as const) {
     const value = values[key];
     if (typeof value === 'number' && Number.isFinite(value) && !Number.isInteger(value)) {
       errors.push(`${key} must be a whole number of millimeters.`);
